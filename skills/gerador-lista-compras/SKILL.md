@@ -30,7 +30,9 @@ Listinia (`/despensa/gerar-lista`) — não invente uma abordagem diferente.
    `Dias Restantes <= frequencia_dias` — ou seja, vai acabar antes da
    próxima ida ao mercado.
 
-3. **Calcule a quantidade sugerida** para cada candidato:
+3. **Calcule a quantidade sugerida por código** (Python, nunca de cabeça —
+   mesma regra da `⚠️ TRAVA` na skill `despensa-dados`), para cada
+   candidato:
    ```
    quantidade_sugerida = max(1, round(consumo_medio * (frequencia_dias / duracao_categoria) - qtd_atual, 1))
    ```
@@ -40,9 +42,12 @@ Listinia (`/despensa/gerar-lista`) — não invente uma abordagem diferente.
    - `alta` se dias_restantes <= frequencia_dias * 0.4
    - `normal` caso contrário
 
-5. **Normalize e deduplique** os nomes dos itens (produtos com nomes
-   parecidos = o mesmo produto — use o nome mais legível). Ordene por
-   urgência (crítica → alta → normal).
+5. **Ordene por urgência** (crítica → alta → normal). **Não deduplique
+   nem funda itens por nome parecido aqui** — cada item já veio como uma
+   linha única e distinta do `despensa-dados` (a normalização/deduplicação
+   de nome acontece só uma vez, no momento da compra). Nesta etapa você só
+   formata e ordena para exibição — nunca some, funda ou recalcule
+   quantidade de dois itens diferentes por acharem parecidos.
 
 6. **Apresente a lista** como checklist, agrupada por urgência, com
    quantidade e unidade. Pergunte se o usuário quer exportar como XLSX

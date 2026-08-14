@@ -44,6 +44,39 @@ Nunca edite ou apague uma linha existente — sempre **acrescente** uma nova
 linha ao final do arquivo. O estado atual é sempre calculado a partir do
 histórico completo, nunca guardado como "verdade fixa" em outro lugar.
 
+## ⚠️ TRAVA — nunca some quantidade "de cabeça" ou por semelhança de nome
+
+Este é o ponto mais perigoso do plugin: se duas compras do mesmo item em
+**datas diferentes** forem somadas errado, ou se dois itens **parecidos
+mas diferentes** forem fundidos em um só, o estoque calculado fica errado
+e todo o resto (dias restantes, lista de compras, dashboard) sai errado
+atrás.
+
+Regras obrigatórias:
+
+1. **Calcule por código, nunca de cabeça.** Escreva e rode um script
+   (Python) que leia o `despensa.jsonl` linha a linha e aplique
+   exatamente o algoritmo da seção abaixo. Não estime ou some
+   mentalmente, mesmo que pareça poucos itens — é exatamente aí que erro
+   de soma entre datas diferentes acontece.
+2. **Agrupamento é por nome normalizado EXATO** (mesmo Title Case), não
+   por "parece o mesmo produto". "Leite Integral 1L" e "Leite
+   Desnatado 1L" são itens DIFERENTES mesmo compartilhando "Leite" — nunca
+   funda dois nomes distintos num grupo só por similaridade textual
+   automaticamente. Se dois nomes provavelmente são o mesmo produto
+   escrito diferente (ex.: nota fiscal abreviada), a normalização de nome
+   acontece **uma vez, no momento de registrar a compra** (skill
+   `captura-nota-fiscal`, com confirmação do usuário) — nunca depois, ao
+   calcular o estado.
+3. **A soma de quantidade só existe dentro do algoritmo de "Qtd Atual"
+   abaixo** (compras desde o último ajuste/checagem, na ordem
+   cronológica correta). Nenhuma outra skill (`gerador-lista-compras`,
+   `dashboard-despensa`, etc.) tem permissão para recalcular ou "ajustar"
+   essa soma — elas só **leem** o resultado já calculado aqui. Se uma
+   etapa de LLM (ex.: normalizar nomes pra exibição na lista de compras)
+   tocar nesses números, é sempre para exibir o mesmo valor, nunca para
+   somar de novo ou estimar um novo total.
+
 ## Como calcular o estado atual de um item
 
 Para cada item (agrupando por nome normalizado, Title Case):
