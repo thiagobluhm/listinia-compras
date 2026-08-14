@@ -1,0 +1,16 @@
+{
+  "name": "listinia-compras",
+  "version": "0.1.0",
+  "description": "Captura notas fiscais por QR code ou foto, mantém sua despensa e um dashboard sempre atualizados, gera listas de compras baseadas no seu consumo real e pesquisa preços em encartes de supermercado.",
+  "author": {
+    "name": "Thiago Bluhm"
+  },
+  "keywords": [
+    "despensa",
+    "lista de compras",
+    "nota fiscal",
+    "nfc-e",
+    "supermercado",
+    "economia doméstica"
+  ]
+}
