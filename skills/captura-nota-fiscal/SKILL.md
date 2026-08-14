@@ -61,4 +61,7 @@ como fallback.
 
 7. **Após a confirmação**, use a skill `despensa-xlsx` para registrar a
    compra e atualizar o estoque, e depois a skill `dashboard-despensa` para
-   atualizar o dashboard com os novos dados.
+   atualizar o dashboard com os novos dados. A skill `despensa-xlsx` sabe
+   onde a planilha real do usuário mora (ou vai perguntar, na primeira
+   vez) — nunca escreva direto num `despensa.xlsx` novo aqui, sempre passe
+   por ela.

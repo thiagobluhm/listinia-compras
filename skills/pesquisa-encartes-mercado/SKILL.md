@@ -12,7 +12,9 @@ escolher, via navegador automatizado.
 
 ## Cadastro de mercados (primeira vez ou quando pedido)
 
-Arquivo: `mercados.json` na pasta de trabalho.
+Arquivo: `mercados.json` — mesmo lugar persistente do `despensa.xlsx` (veja
+a seção de persistência na skill `despensa-xlsx`). Carregue o real antes
+de assumir que não existe nenhum mercado cadastrado.
 
 ```json
 {

@@ -10,14 +10,24 @@ Listinia (`/despensa/gerar-lista`) — não invente uma abordagem diferente.
 
 ## Passo a passo
 
-1. **Carregue a cadência de compra do usuário.** Leia `config-habitos.json`
-   na pasta de trabalho (se existir) para pegar `frequencia_dias`. Se o
-   arquivo não existir, pergunte ao usuário uma vez ("de quanto em quanto
-   tempo você costuma ir ao mercado?") e salve a resposta nesse arquivo
-   para as próximas vezes. Default do app real, caso o usuário não saiba:
-   `frequencia_dias = 7` (semanal).
+0. **Opcional — checagem visual.** Se o usuário anexar fotos da geladeira
+   e/ou da despensa junto com o pedido da lista, ou aceitar quando você
+   oferecer essa opção, use a skill `checagem-visual-despensa` primeiro
+   para confirmar visualmente o que ainda tem em casa antes de calcular a
+   lista. Não é obrigatório — sem fotos, siga direto pelo passo 1 usando
+   só os dados da planilha.
 
-2. **Leia a aba "Despensa"** de `despensa.xlsx` (skill `despensa-xlsx`).
+1. **Carregue a cadência de compra do usuário.** `config-habitos.json` vive
+   no mesmo lugar persistente que `despensa.xlsx` (veja a seção de
+   persistência na skill `despensa-xlsx` — memória do projeto → pasta do
+   dispositivo → pasta de trabalho da sessão como último recurso). Leia de
+   lá para pegar `frequencia_dias`. Se o arquivo não existir, pergunte ao
+   usuário uma vez ("de quanto em quanto tempo você costuma ir ao
+   mercado?") e salve a resposta no mesmo lugar persistente. Default do
+   app real, caso o usuário não saiba: `frequencia_dias = 7` (semanal).
+
+2. **Leia a aba "Despensa"** de `despensa.xlsx` (skill `despensa-xlsx` —
+   carregue a planilha real, nunca uma nova).
    Um item é candidato se `Dias Restantes <= frequencia_dias` — ou seja,
    vai acabar antes da próxima ida ao mercado.
 

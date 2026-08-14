@@ -1,21 +1,22 @@
-# listinia-compras
+# Listinia Despensa
 
-Listinia de compras, aqui temos um aplicativo capaz de ajudar todos na hora de criar uma lista de compras, porem com algo a mais.
+Plugin de Cowork para gestão pessoal de despensa: captura notas fiscais
+(por QR code ou foto), mantém uma planilha de despensa e um dashboard
+sempre atualizados, gera listas de compras baseadas no seu consumo real, e
+pesquisa preços em encartes de supermercado.
 
-Este repositório contém o **plugin de Cowork "listinia-compras"**: captura
-notas fiscais (por QR code ou foto), mantém uma planilha de despensa e um
-dashboard sempre atualizados, gera listas de compras baseadas no seu
-consumo real, e pesquisa preços em encartes de supermercado.
-
-O plugin é um companheiro **standalone** — guarda tudo localmente na sessão
-do Cowork, em arquivos que você pode abrir e levar com você (XLSX, JSON,
-dashboard HTML), sem depender de nenhum backend estar no ar.
+Este plugin é um companheiro **standalone** ao produto Listinia (não
+depende do backend/SaaS Listinia estar no ar) — os dados ficam em arquivos
+que você pode abrir e levar com você (XLSX, JSON, dashboard HTML). Veja a
+seção "Persistência dos dados" abaixo — é importante entender onde esses
+arquivos moram antes de usar no dia a dia.
 
 ## O que ele faz
 
 | Skill | O que faz |
 |---|---|
 | `captura-nota-fiscal` | Lê o QR code da nota (Playwright abre a página da SEFAZ) ou, se não der, lê a foto direto. Extrai os itens da compra. |
+| `checagem-visual-despensa` | Reconhece itens em fotos da geladeira/despensa e confirma com você o que já acabou, como parte de gerar a lista de compras. |
 | `despensa-xlsx` | Mantém `despensa.xlsx` — log de compras e estoque atual por item, com categoria e dias restantes de estoque. |
 | `dashboard-despensa` | Dashboard HTML persistente (artefato do Cowork) com gasto por categoria, top produtos, mercados mais usados e itens acabando. |
 | `gerador-lista-compras` | Gera a lista de compras da próxima ida ao mercado, baseada no consumo real e na sua frequência de compra. |
@@ -26,58 +27,68 @@ dashboard HTML), sem depender de nenhum backend estar no ar.
 
 1. Fotografe ou anexe uma nota fiscal e diga algo como "captura essa nota".
 2. Depois de algumas compras, peça "monta minha lista de compras" ou "como
-   tá minha despensa".
-3. Na primeira vez que pedir preços, o Cowork vai perguntar quais mercados
-   você usa (nome, endereço, site, página de ofertas).
+   tá minha despensa". Se quiser mais precisão, anexe fotos da geladeira e
+   da despensa junto do pedido da lista — o plugin confirma com você o que
+   ainda tem antes de fechar a lista.
+3. Na primeira vez que pedir preços, o Cowork vai te perguntar quais
+   mercados você usa (nome, endereço, site, página de ofertas).
 4. Peça o dashboard quando quiser ver o panorama geral de gastos.
 
-## Estrutura do plugin
-
-```
-listinia-compras/
-├── .claude-plugin/
-│   └── plugin.json
-├── .mcp.json                        # MCP server oficial do Playwright
-├── skills/
-│   ├── captura-nota-fiscal/
-│   ├── despensa-xlsx/
-│   │   └── references/categorias.md
-│   ├── dashboard-despensa/
-│   ├── gerador-lista-compras/
-│   ├── pesquisa-encartes-mercado/
-│   └── alerta-estoque-baixo/
-└── README.md
-```
-
-## Arquivos que o plugin gera na pasta de trabalho da sessão
+## Arquivos que o plugin gera
 
 - `despensa.xlsx` — planilha com abas "Compras" e "Despensa"
 - `mercados.json` — mercados preferidos cadastrados
 - `config-habitos.json` — frequência de compra do usuário
 - dashboard `dashboard-despensa` — artefato HTML persistente no Cowork
 
+## ⚠️ Persistência dos dados (importante)
+
+Cada conversa nova do Cowork começa com um espaço de trabalho vazio. Para
+a despensa não "resetar" a cada chat, o plugin segue esta ordem:
+
+1. **App desktop do Claude conectado, com uma pasta do projeto vinculada**:
+   este é o cenário com persistência real. Na primeira vez, o plugin
+   pergunta em qual pasta do seu computador guardar `despensa.xlsx` e
+   grava esse caminho na memória do projeto. Nas próximas conversas, ele
+   carrega o arquivo real de lá antes de fazer qualquer alteração — nunca
+   cria um novo do zero.
+2. **Sem app desktop conectado (ex.: uso só pelo celular/web)**: hoje não
+   existe um jeito de manter a despensa entre conversas separadas — cada
+   chat novo cria uma planilha própria, que não sobrevive ao fim da
+   conversa. O plugin avisa isso no início. Nesse cenário, o dashboard
+   também não funciona como artefato persistente, só como arquivo HTML
+   avulso a cada pedido.
+
+Recomendação: use o Cowork pelo app desktop, com a pasta do projeto
+conectada, para ter uma despensa única e sempre atualizada. Pelo
+celular/web, o plugin ainda funciona (captura, categoriza, calcula), mas
+os dados não persistem entre conversas — trate como um teste pontual, não
+como o fluxo principal, até que exista um backend dedicado (veja Roadmap).
+
 ## Dependência técnica
 
-Este plugin usa o servidor MCP oficial do Playwright (`@playwright/mcp`,
-via `npx`) para abrir páginas da SEFAZ e sites de supermercado. Requer
-Node.js disponível no ambiente onde o Cowork roda.
+Este plugin usa o servidor MCP oficial do Playwright
+(`@playwright/mcp`, via `npx`) para abrir páginas da SEFAZ e sites de
+supermercado. Isso requer Node.js disponível no ambiente onde o Cowork
+roda — normalmente já presente no sandbox do Cowork.
 
 ## Origem das regras de negócio
 
 As categorias de produto, as durações padrão de estoque por categoria
 (ex.: hortifrúti 5 dias, laticínios 10, limpeza 45) e a fórmula de dias
-restantes foram portadas do backend real do app Listinia do autor, para
-manter consistência com um sistema já validado em produção, em vez de
-valores inventados.
+restantes foram portadas diretamente do backend real do app Listinia do
+autor (`categorizer.py`, `config.py`, `despensa.py`), para manter
+consistência com um sistema já validado em produção, em vez de valores
+inventados.
 
-## Roadmap
+## Autoria
+
+Desenvolvido por Thiago Bluhm — AIstein LTDA.
+
+## Roadmap (fora do escopo desta versão)
 
 A pesquisa de encartes hoje é feita ao vivo, via scraping. A ideia é que,
 futuramente, isso evolua para um MCP dedicado conectando diretamente ao
 marketplace de ofertas do backend Listinia (onde supermercados cadastrados
 competem por oferta). Esse MCP ainda não existe e não faz parte deste
 plugin.
-
-## Licença
-
-MIT — veja [LICENSE](./LICENSE).

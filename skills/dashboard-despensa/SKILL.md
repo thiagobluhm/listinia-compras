@@ -41,3 +41,10 @@ um arquivo novo a cada pedido.
    os artefatos existentes). Se não existir, crie com `create_artifact`
    usando o id `dashboard-despensa`. Se já existir, atualize no lugar com
    `update_artifact` em vez de criar um novo.
+
+**Limitação a avisar ao usuário:** `create_artifact`/`update_artifact` só
+funcionam com o app desktop do Claude conectado — o artefato não aparece
+no Cowork via celular/web. Se essas ferramentas não estiverem disponíveis
+nesta sessão, entregue o dashboard apenas como arquivo HTML avulso
+(`SendUserFile`) e avise o usuário que, sem o app desktop, cada pedido vai
+gerar um HTML novo em vez de atualizar um painel único.

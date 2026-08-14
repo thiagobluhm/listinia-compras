@@ -7,7 +7,8 @@ description: Analyzes the pantry spreadsheet for items likely to run out soon an
 
 ## Análise (sempre que chamada)
 
-1. Leia a aba "Despensa" de `despensa.xlsx` (skill `despensa-xlsx`).
+1. Leia a aba "Despensa" de `despensa.xlsx` — carregue a planilha real do
+   lugar persistente (skill `despensa-xlsx`), nunca uma nova.
 2. Liste os itens com status crítico ou baixo (mesma fórmula/limiares da
    skill `despensa-xlsx`), ordenados por Dias Restantes crescente.
 3. Responda em texto curto e direto: quais itens, há quantos dias restam,
