@@ -59,9 +59,10 @@ como fallback.
    sempre passa por uma tela de revisão antes de gravar na despensa. Deixe
    fácil corrigir nome, categoria, quantidade ou preço de qualquer item.
 
-7. **Após a confirmação**, use a skill `despensa-xlsx` para registrar a
-   compra e atualizar o estoque, e depois a skill `dashboard-despensa` para
-   atualizar o dashboard com os novos dados. A skill `despensa-xlsx` sabe
-   onde a planilha real do usuário mora (ou vai perguntar, na primeira
-   vez) — nunca escreva direto num `despensa.xlsx` novo aqui, sempre passe
-   por ela.
+7. **Após a confirmação**, use a skill `despensa-dados` para registrar a
+   compra (evento `compra` no `despensa.jsonl`) e depois a skill
+   `dashboard-despensa` para atualizar o dashboard com os novos dados. A
+   skill `despensa-dados` sabe onde os dados reais do usuário moram (Google
+   Drive, anexo manual ou só a sessão — vai perguntar/avisar conforme o
+   caso) — nunca escreva direto num arquivo novo aqui, sempre passe por
+   ela.

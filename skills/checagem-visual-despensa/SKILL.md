@@ -24,8 +24,9 @@ periodicamente ou sem o usuário estar ativamente pedindo a lista.
    Não force reconhecimento de itens pouco claros — se não tem certeza,
    não liste.
 
-3. **Carregue a despensa real** (skill `despensa-xlsx` — sempre a
-   planilha real e persistente, nunca uma nova) e compare item a item:
+3. **Carregue a despensa real** (skill `despensa-dados` — a partir do
+   `despensa.jsonl` real e persistente, nunca do zero) e compare item a
+   item:
    - Está na despensa **e** aparece claramente na foto → confirmado em
      estoque.
    - Está na despensa com Dias Restantes baixo/zerado **e não aparece**
@@ -41,12 +42,12 @@ periodicamente ou sem o usuário estar ativamente pedindo a lista.
    ```
    Pergunte direto (pode ser sim/não em bloco). Nunca decida sozinho.
 
-5. **Só depois da confirmação do usuário**, atualize a despensa: zere ou
-   ajuste a Qtd Atual dos itens confirmados como acabados, mantenha os
-   confirmados como presentes. Reconhecimento visual erra — produto
-   escondido atrás de outro, embalagem parecida, foto com pouca luz — por
-   isso a confirmação do usuário é obrigatória antes de mexer na
-   planilha real.
+5. **Só depois da confirmação do usuário**, acrescente eventos
+   `checagem_visual` ao `despensa.jsonl` (skill `despensa-dados`) para os
+   itens confirmados como acabados ou confirmados como presentes.
+   Reconhecimento visual erra — produto escondido atrás de outro,
+   embalagem parecida, foto com pouca luz — por isso a confirmação do
+   usuário é obrigatória antes de gravar qualquer coisa.
 
 6. **Com a despensa atualizada, siga normalmente para a skill
    `gerador-lista-compras`** — agora a lista sai baseada numa foto real do

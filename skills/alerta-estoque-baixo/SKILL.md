@@ -7,10 +7,10 @@ description: Analyzes the pantry spreadsheet for items likely to run out soon an
 
 ## Análise (sempre que chamada)
 
-1. Leia a aba "Despensa" de `despensa.xlsx` — carregue a planilha real do
-   lugar persistente (skill `despensa-xlsx`), nunca uma nova.
+1. Carregue o `despensa.jsonl` real (skill `despensa-dados`, nunca um
+   novo) e calcule o estado atual.
 2. Liste os itens com status crítico ou baixo (mesma fórmula/limiares da
-   skill `despensa-xlsx`), ordenados por Dias Restantes crescente.
+   skill `despensa-dados`), ordenados por Dias Restantes crescente.
 3. Responda em texto curto e direto: quais itens, há quantos dias restam,
    sem tabela extensa a menos que o usuário peça.
 
@@ -27,6 +27,10 @@ tarefa recorrente sem o usuário pedir):
    a maioria dos usuários compra a cada 7 dias).
 3. Crie a tarefa agendada usando as ferramentas de scheduled task do
    Cowork (`create_trigger`), com um prompt que reexecuta esta mesma
-   análise sobre `despensa.xlsx` e envia o resumo como notificação.
+   análise sobre o `despensa.jsonl` e envia o resumo como notificação.
+   Isso só funciona de forma confiável se os dados estiverem na Camada 1
+   (Google Drive) — sem Drive conectado, não há como uma tarefa agendada
+   (que roda numa sessão nova, sem anexos) acessar os dados. Avise isso
+   se o usuário estiver na Camada 2 ou 3.
 4. Confirme com o usuário o horário/dia exato antes de criar, e informe
    claramente depois de criada (nome da tarefa e quando ela roda).

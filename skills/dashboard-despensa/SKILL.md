@@ -1,50 +1,57 @@
 ---
 name: dashboard-despensa
-description: Builds and keeps updated a persistent HTML dashboard (saved as a Cowork artifact) showing pantry status, spending by category, top purchased products, and most-used markets, sourced from despensa.xlsx. Use when the user asks to see the pantry dashboard, a spending overview, "como tá minha despensa", "quanto eu gastei", or right after new purchases have been logged and the dashboard needs refreshing.
+description: Builds and keeps updated a Markdown pantry dashboard showing spending by category, top purchased products, most-used markets, and low-stock items, sourced from the pantry spreadsheet in Google Drive. Renders inline in any channel (mobile, web, desktop). Use when the user asks to see the pantry dashboard, a spending overview, "como tá minha despensa", "quanto eu gastei", or right after new purchases have been logged and the dashboard needs refreshing.
 ---
 
-# Dashboard da Despensa
+# Dashboard da Despensa (Markdown, omnichannel)
 
-Antes de montar qualquer gráfico ou layout, siga a skill `dataviz` para
-paleta de cores, tipos de gráfico e estilo consistente. Esta skill aqui
-define o *conteúdo* do dashboard — a skill `dataviz` cuida da estética.
+## Por que Markdown, não HTML
+
+O mecanismo de artefato HTML persistente (`create_artifact`/`update_artifact`)
+só funciona com o app desktop do Claude conectado — não aparece no Cowork
+via celular/web, que é onde a maioria das pessoas vai usar este plugin.
+Markdown (`.md`) renderiza igual em qualquer canal, então o dashboard vive
+como um arquivo `.md`, seguindo a mesma estratégia de persistência em
+camadas dos outros dados do plugin (veja
+`despensa-dados/references/persistencia.md`: Google Drive → anexo manual
+→ só a sessão), e é reenviado pro chat sempre atualizado quando pedido.
 
 ## Fonte de dados
 
-Leia `despensa.xlsx` (abas "Compras" e "Despensa" — ver skill
-`despensa-xlsx` para o schema). Nunca invente números: se uma seção não
-tiver dados suficientes (ex.: usuário ainda não registrou nenhuma compra),
-mostre um estado vazio explicando o que falta, em vez de estimar.
+Carregue o `despensa.jsonl` real (skill `despensa-dados` — nunca leia um
+arquivo novo/vazio) e calcule o estado atual a partir dele. Nunca invente
+números: se uma seção não tiver dados suficientes (ex.: usuário ainda não
+registrou nenhuma compra), mostre um estado vazio explicando o que falta,
+em vez de estimar.
 
 ## Seções do dashboard
 
 1. **Resumo do mês**: total gasto no mês corrente, número de notas
    registradas, comparação com o mês anterior (se houver dado).
-2. **Gasto por categoria**: soma de "Preço Total" agrupado por "Categoria"
-   na aba Compras — gráfico de barras ou pizza (siga `dataviz`).
-3. **Top produtos**: os itens mais comprados por frequência (contagem de
-   linhas por "Item" na aba Compras) e por gasto acumulado.
-4. **Mercados mais usados**: contagem de notas por "Mercado".
-5. **Estado da despensa**: itens com status crítico/baixo (aba Despensa),
-   destacados com urgência visual — é a seção mais acionável do dashboard.
-6. **Histórico de gasto**: gasto por mês, últimos 6 meses, para mostrar
-   tendência.
+2. **Gasto por categoria**: tabela com categoria, valor gasto e % do
+   total, ordenada do maior pro menor gasto.
+3. **Top produtos**: tabela dos itens mais comprados por frequência e por
+   gasto acumulado.
+4. **Mercados mais usados**: tabela com mercado e número de notas.
+5. **Estado da despensa**: lista dos itens com status crítico/baixo,
+   ordenados por dias restantes — a seção mais acionável, destaque com
+   negrito ou emoji (🔴 crítico, 🟡 baixo).
+6. **Histórico de gasto**: tabela de gasto por mês, últimos 6 meses.
+
+Use tabelas Markdown simples para os números — sem tentar recriar gráficos
+complexos em texto. Se quiser um indicativo visual rápido de proporção,
+pode usar blocos de caractere (ex.: `███████░░░` ao lado do %), mas mantenha
+simples e legível.
 
 ## Persistência (importante)
 
-Este dashboard deve ser um artefato que o usuário reabre e atualiza — não
-um arquivo novo a cada pedido.
+Siga `despensa-dados/references/persistencia.md` para o arquivo
+`Listinia - Dashboard.md` (nome exato, para a busca sempre achar o
+mesmo arquivo nas próximas vezes).
 
-1. Escreva o HTML autocontido (CSS/JS inline) em um arquivo local.
-2. Chame `SendUserFile` para obter o `file_uuid`.
-3. Verifique se já existe um artefato chamado `dashboard-despensa` (liste
-   os artefatos existentes). Se não existir, crie com `create_artifact`
-   usando o id `dashboard-despensa`. Se já existir, atualize no lugar com
-   `update_artifact` em vez de criar um novo.
-
-**Limitação a avisar ao usuário:** `create_artifact`/`update_artifact` só
-funcionam com o app desktop do Claude conectado — o artefato não aparece
-no Cowork via celular/web. Se essas ferramentas não estiverem disponíveis
-nesta sessão, entregue o dashboard apenas como arquivo HTML avulso
-(`SendUserFile`) e avise o usuário que, sem o app desktop, cada pedido vai
-gerar um HTML novo em vez de atualizar um painel único.
+**Sempre entregue a versão atual no chat também, via `SendUserFile`** —
+arquivos `.md` renderizam inline na conversa, então o usuário vê o
+dashboard na hora, em qualquer canal, sem precisar abrir nada à parte.
+Isso vale mesmo quando a Camada 1 (Drive) está disponível — a entrega no
+chat é sempre feita, o Drive é só o que garante que o mesmo dashboard
+continua ali na próxima conversa.
