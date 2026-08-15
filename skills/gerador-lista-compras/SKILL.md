@@ -30,18 +30,32 @@ que você fez por dentro.
 Reproduz a mesma lógica determinística + LLM usada em produção no app
 Listinia (`/despensa/gerar-lista`) — não invente uma abordagem diferente.
 
+## ✅ Progresso visível — obrigatório
+
+Assim que o pedido de lista começar, crie uma lista de etapas ("Conferir
+despensa", "Calcular itens", "Montar lista") e marque cada uma concluída
+na hora. Isso substitui narrar cada passo em texto.
+
 ## Passo a passo
 
-0. **Opcional — checagem visual.** Se o usuário anexar fotos da geladeira
-   e/ou da despensa junto com o pedido da lista, ou aceitar quando você
-   oferecer essa opção, use a skill `checagem-visual-despensa` primeiro
-   para confirmar visualmente o que ainda tem em casa antes de calcular a
-   lista. Não é obrigatório — sem fotos, siga direto pelo passo 1 usando
-   só os dados da planilha.
+0. **Pergunte rapidamente sobre a checagem visual (opcional, uma linha).**
+   Se o pedido já veio com fotos da geladeira/despensa anexadas, use a
+   skill `checagem-visual-despensa` direto. Se não veio nenhuma foto,
+   ofereça em uma frase antes de calcular:
+
+   > Quer mandar uma foto da geladeira e/ou da despensa pra eu conferir o
+   > que realmente ainda tem em casa? Não precisa — se preferir, eu sigo
+   > só com o histórico de compras.
+
+   Aceitou → skill `checagem-visual-despensa`. Recusou ou não respondeu
+   nada sobre isso e só quer a lista → siga direto pelo passo 1 usando só
+   os dados da planilha, sem insistir de novo.
 
 1. **Carregue a cadência de compra do usuário.** `config-habitos.json`
    fica no mesmo lugar dos outros dados do plugin — use a skill
-   `despensa-dados` (seção "Receita do Google Drive") para ler e gravar.
+   `despensa-dados` (a mesma lógica de "onde salvar" da seção 1 dela,
+   incluindo a reconciliação pasta local ↔ Drive quando os dois existirem
+   — nunca pule direto pro Drive se a pasta local estiver disponível).
    Pegue de lá o `frequencia_dias`. Se o arquivo não existir, pergunte
    uma vez ("de quanto em quanto tempo você costuma ir ao mercado?") e
    salve a resposta no mesmo lugar persistente. Default do app real, caso

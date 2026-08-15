@@ -212,7 +212,11 @@ Chamado pela `captura-nota-fiscal` depois que o usuário confirmou.
      `p = preço unitário`.
    - Produto novo → acrescente a linha.
 3. Grave o `despensa.jsonl` novo (no canal principal desta sessão — seção
-   1.1) e, separadamente, o arquivo de detalhe daquela nota.
+   1.1) e, separadamente, o arquivo de detalhe daquela nota. **Se pelo
+   menos um canal (pasta local ou Drive) gravou com sucesso, não use
+   `SendUserFile` pra mandar esses arquivos pro chat** — isso é só pra
+   quando "nenhum dos dois" existir (seção 1.1). Mandar o arquivo pro chat
+   quando já salvou de verdade é ruído técnico que o usuário não pediu.
 4. Responda em duas linhas: quantos itens entraram, o total da nota, onde
    salvou. Se algum campo ficou ilegível, cite em uma linha depois.
 5. Só então, se os dois canais existirem, dispare o espelhamento da seção
