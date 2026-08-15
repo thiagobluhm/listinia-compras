@@ -11,10 +11,11 @@ O mecanismo de artefato HTML persistente (`create_artifact`/`update_artifact`)
 só funciona com o app desktop do Claude conectado — não aparece no Cowork
 via celular/web, que é onde a maioria das pessoas vai usar este plugin.
 Markdown (`.md`) renderiza igual em qualquer canal, então o dashboard vive
-como um arquivo `.md`, seguindo a mesma estratégia de persistência em
-camadas dos outros dados do plugin (veja
-`despensa-dados/references/persistencia.md`: Google Drive → anexo manual
-→ só a sessão), e é reenviado pro chat sempre atualizado quando pedido.
+como um arquivo `.md`, guardado no mesmo lugar dos outros dados do plugin,
+e é reenviado pro chat sempre atualizado quando pedido.
+
+**Gere o dashboard só quando o usuário pedir.** Nunca depois de registrar
+uma nota por conta própria — isso deixa a captura lenta à toa.
 
 ## Fonte de dados
 
@@ -45,13 +46,13 @@ simples e legível.
 
 ## Persistência (importante)
 
-Siga `despensa-dados/references/persistencia.md` para o arquivo
-`Listinia - Dashboard.md` (nome exato, para a busca sempre achar o
-mesmo arquivo nas próximas vezes).
+Grave o arquivo `Listinia - Dashboard.md` (nome exato) usando a skill
+`despensa-dados`, seção "Receita do Google Drive" — mesma pasta, mesmo
+ciclo, mudando só o `title`.
 
 **Sempre entregue a versão atual no chat também, via `SendUserFile`** —
 arquivos `.md` renderizam inline na conversa, então o usuário vê o
 dashboard na hora, em qualquer canal, sem precisar abrir nada à parte.
-Isso vale mesmo quando a Camada 1 (Drive) está disponível — a entrega no
-chat é sempre feita, o Drive é só o que garante que o mesmo dashboard
-continua ali na próxima conversa.
+Isso vale mesmo com o Drive disponível: a entrega no chat é sempre feita,
+o Drive é só o que garante que o mesmo dashboard continua ali na próxima
+conversa.

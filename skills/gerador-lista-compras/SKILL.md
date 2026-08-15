@@ -18,9 +18,9 @@ Listinia (`/despensa/gerar-lista`) — não invente uma abordagem diferente.
    só os dados da planilha.
 
 1. **Carregue a cadência de compra do usuário.** `config-habitos.json`
-   segue a mesma estratégia de persistência em camadas dos outros dados do
-   plugin (`despensa-dados/references/persistencia.md`). Leia de lá para
-   pegar `frequencia_dias`. Se o arquivo não existir, pergunte ao usuário
+   fica no mesmo lugar dos outros dados do plugin — use a skill
+   `despensa-dados` (seção "Receita do Google Drive") para ler e gravar.
+   Pegue de lá o `frequencia_dias`. Se o arquivo não existir, pergunte
    uma vez ("de quanto em quanto tempo você costuma ir ao mercado?") e
    salve a resposta no mesmo lugar persistente. Default do app real, caso
    o usuário não saiba: `frequencia_dias = 7` (semanal).

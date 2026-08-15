@@ -28,9 +28,8 @@ tarefa recorrente sem o usuário pedir):
 3. Crie a tarefa agendada usando as ferramentas de scheduled task do
    Cowork (`create_trigger`), com um prompt que reexecuta esta mesma
    análise sobre o `despensa.jsonl` e envia o resumo como notificação.
-   Isso só funciona de forma confiável se os dados estiverem na Camada 1
-   (Google Drive) — sem Drive conectado, não há como uma tarefa agendada
-   (que roda numa sessão nova, sem anexos) acessar os dados. Avise isso
-   se o usuário estiver na Camada 2 ou 3.
+   Isso só funciona de forma confiável com o Google Drive conectado — uma
+   tarefa agendada roda numa sessão nova, sem anexos, então sem Drive ela
+   não tem como acessar os dados. Avise se for o caso.
 4. Confirme com o usuário o horário/dia exato antes de criar, e informe
    claramente depois de criada (nome da tarefa e quando ela roda).

@@ -48,28 +48,23 @@ dos dados" abaixo antes de usar no dia a dia.
 
 Cada conversa nova do Cowork começa do zero — a maioria das pessoas usa o
 Cowork pelo celular, sem nenhum dispositivo conectado. Para os dados não
-"resetarem" a cada chat, o plugin segue uma estratégia em camadas, sempre
-tentando a melhor opção disponível, **sem nunca obrigar nada**:
+"resetarem" a cada chat:
 
-1. **Google Drive conectado (recomendado, funciona em qualquer canal)**:
-   os arquivos ficam salvos no Google Drive da sua conta e são lidos/
-   atualizados automaticamente a cada conversa — celular, web ou desktop,
-   tanto faz. É a única camada 100% automática: depois de conectar o
-   Drive uma vez (nas configurações de conectores do Claude), você não
-   precisa fazer mais nada manual.
-2. **Sem Google Drive, com anexo manual**: você pode anexar o arquivo
-   salvo de uma conversa anterior no início de uma nova conversa pra
-   continuar de onde parou, e no fim recebe o arquivo atualizado pra
-   guardar. Funciona sem depender de nenhum conector, mas dá mais
-   trabalho e tem mais chance de erro humano (esquecer de salvar, anexar
-   versão antiga) — recomendamos conectar o Google Drive se possível.
-3. **Sem nenhum dos dois**: os dados existem só durante aquela conversa. O
-   plugin avisa isso claramente no início, e sempre oferece os arquivos
-   pra download no fim, como registro.
+**Com o Google Drive conectado (recomendado):** os arquivos ficam numa
+pasta chamada `Listinia Compras` no seu Drive e são lidos e atualizados
+automaticamente a cada conversa — celular, web ou desktop, tanto faz.
+Depois de conectar o Drive uma vez (nas configurações de conectores do
+Claude), não há nada manual a fazer.
 
-O dashboard (Markdown) e a checagem de estoque agendada (`alerta-estoque-
-baixo`) funcionam de verdade apenas com a Camada 1 (Drive) — uma tarefa
-agendada roda numa sessão nova, sem anexo manual possível.
+**Sem Google Drive:** o plugin continua funcionando, mas a persistência
+passa a ser manual — no fim da conversa você recebe o arquivo atualizado
+pra guardar e reanexa no começo da próxima. Dá mais trabalho e tem mais
+chance de erro humano, então vale conectar o Drive se puder. O plugin
+nunca obriga: se não tiver, avisa e segue.
+
+A checagem de estoque agendada (`alerta-estoque-baixo`) só funciona com o
+Drive conectado — uma tarefa agendada roda numa sessão nova, onde não há
+como anexar arquivo.
 
 ## Dependência técnica
 

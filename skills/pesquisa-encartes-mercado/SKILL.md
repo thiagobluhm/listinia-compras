@@ -12,10 +12,10 @@ escolher, via navegador automatizado.
 
 ## Cadastro de mercados (primeira vez ou quando pedido)
 
-Arquivo: `mercados.json` — mesma estratégia de persistência em camadas dos
-outros dados do plugin (veja `despensa-dados/references/persistencia.md`:
-Google Drive → anexo manual → só a sessão). Carregue o real antes de
-assumir que não existe nenhum mercado cadastrado.
+Arquivo: `mercados.json`, guardado no mesmo lugar dos outros dados do
+plugin — use a skill `despensa-dados` (seção "Receita do Google Drive")
+para ler e gravar, mudando só o `title`. Carregue o real antes de assumir
+que não existe nenhum mercado cadastrado.
 
 ```json
 {

@@ -3,66 +3,67 @@ name: captura-nota-fiscal
 description: Captures a Brazilian grocery or pharmacy receipt (nota fiscal / NFC-e), reading its QR code and scraping the official SEFAZ page via Playwright to get the itemized purchase, falling back to reading the photo directly when the QR code isn't legible. Use when the user says things like "captura essa nota", "lê essa nota fiscal", "escaneia esse cupom", "processa essa nota de compra", "joga essa nota na despensa", or attaches a photo/PDF of a supermarket or pharmacy receipt.
 ---
 
-# Captura de Nota Fiscal (QR + Playwright, fallback foto)
+# Captura de Nota Fiscal
 
-Este pipeline é o mesmo usado em produção no app Listinia real do usuário
-(`sefaz_scraper.py` + `qrcode_reader.py`) — siga os mesmos passos e a mesma
-ordem de prioridade: QR code primeiro (mais preciso e mais barato), foto
-como fallback.
+Mesmo pipeline usado em produção no app Listinia real (`qrcode_reader.py` +
+`sefaz_scraper.py`): QR code primeiro (mais preciso), foto como fallback.
+
+O fluxo inteiro é: **ler → mostrar → confirmar → registrar → perguntar o
+que vem agora.** Nada além disso. Não gere dashboard, não calcule estoque,
+não faça análise de consumo aqui.
 
 ## Passo a passo
 
-1. **Obtenha a imagem.** Se o usuário já anexou uma foto ou PDF da nota, use-a.
-   Caso contrário, peça uma foto nítida que mostre o QR code E a lista de itens.
+1. **Obtenha a imagem.** Se o usuário já anexou foto ou PDF, use. Senão,
+   peça uma foto nítida mostrando o QR code E a lista de itens.
 
-2. **Decodifique o QR code.** Rode um script Python curto para ler o QR code
-   da imagem (instale `pyzbar` ou `zxing-cpp` via pip se não estiverem
-   disponíveis: `pip install pyzbar zxing-cpp --break-system-packages`).
-   Se preferir, tente `qrcode`/`opencv-python` como alternativa — o objetivo
-   é extrair a URL de texto codificada no QR (deve começar com `http`).
+2. **Decodifique o QR code** com um script Python curto (`pip install
+   pyzbar zxing-cpp --break-system-packages` se preciso; `opencv-python`
+   serve de alternativa). O objetivo é extrair a URL codificada.
 
-3. **Se a URL foi decodificada com sucesso:**
-   - Use as ferramentas MCP do Playwright (`playwright`) para navegar até a URL.
-   - Aguarde a página carregar completamente — páginas de NFC-e da SEFAZ são
-     Angular/JS e populam o conteúdo depois do load inicial, então espere o
-     texto do corpo estabilizar antes de extrair.
-   - Extraia o texto visível da página (nome do estabelecimento, CNPJ, data,
-     lista de itens com quantidade/unidade/preço, total).
-   - Se a página não carregar em ~30s ou retornar conteúdo muito curto
-     (menos de ~100 caracteres), trate como falha e caia no fallback do
-     passo 4.
+3. **Se decodificou a URL:** use as ferramentas MCP do Playwright pra
+   navegar até ela. Páginas de NFC-e da SEFAZ são Angular/JS — espere o
+   conteúdo popular antes de extrair. Pegue estabelecimento, CNPJ, data,
+   itens (quantidade/unidade/preço) e total. Se não carregar em ~30s ou
+   voltar conteúdo muito curto (<100 caracteres), trate como falha e vá
+   pro passo 4.
 
-4. **Fallback — leia a foto diretamente.** Se o QR não foi legível ou o
-   scraping da SEFAZ falhou, você já consegue ler imagens nativamente: olhe
-   a foto da nota e extraia os mesmos campos diretamente do papel impresso.
-   Avise o usuário que este método é menos preciso (letras apagadas, cupom
-   fiscal térmico desbotado) e peça para conferir os valores com atenção.
+4. **Fallback — leia a foto.** Você lê imagens nativamente: extraia os
+   mesmos campos direto do cupom. Avise que é menos preciso (cupom térmico
+   desbota) e peça atenção na conferência.
 
-5. **Estruture o resultado** neste formato, independente do método usado:
+5. **Estruture o resultado**, independente do método:
    ```json
    {
-     "estabelecimento": "nome da loja/supermercado",
+     "estabelecimento": "nome da loja",
      "data_compra": "YYYY-MM-DD",
      "total": 0.00,
      "metodo": "qrcode | foto",
      "itens": [
-       {"nome": "nome do produto", "quantidade": 1.0, "unidade": "UN|KG|G|L|ML|CX|PCT", "preco_unitario": 0.00, "preco_total": 0.00}
+       {"nome": "produto", "quantidade": 1.0, "unidade": "UN|KG|G|L|ML|CX|PCT", "preco_unitario": 0.00, "preco_total": 0.00}
      ]
    }
    ```
-   Normalize nomes de produto para algo legível (ex: "LEITE INTEG UHT 1L" →
-   "Leite Integral 1L"). Nunca invente preços ou quantidades que não estão
-   na nota — se um campo não aparece, deixe null e avise o usuário.
+   Normalize nomes pra algo legível ("LEITE INTEG UHT 1L" → "Leite
+   Integral 1L"). **Nunca invente preço ou quantidade**: campo ilegível
+   vai como `null`.
 
-6. **Mostre os itens extraídos ao usuário em uma tabela compacta e peça
-   confirmação** antes de salvar qualquer coisa — igual ao app real, que
-   sempre passa por uma tela de revisão antes de gravar na despensa. Deixe
-   fácil corrigir nome, categoria, quantidade ou preço de qualquer item.
+6. **Mostre os itens em tabela compacta e peça confirmação** — uma vez só.
+   Marque com `?` os itens que ficaram com campo `null`, pra ele corrigir
+   se quiser.
 
-7. **Após a confirmação**, use a skill `despensa-dados` para registrar a
-   compra (evento `compra` no `despensa.jsonl`) e depois a skill
-   `dashboard-despensa` para atualizar o dashboard com os novos dados. A
-   skill `despensa-dados` sabe onde os dados reais do usuário moram (Google
-   Drive, anexo manual ou só a sessão — vai perguntar/avisar conforme o
-   caso) — nunca escreva direto num arquivo novo aqui, sempre passe por
-   ela.
+7. **Registre** com a skill `despensa-dados` (evento `compra`). Se o
+   usuário respondeu "registra", "pode salvar", "ok" ou equivalente,
+   **registre tudo imediatamente**, incluindo os itens marcados com `?`
+   (que entram com `null` + `obs`). Não repita a pergunta, não peça
+   confirmação item a item — ele já decidiu. Mencione as pendências em uma
+   linha **depois** de salvar.
+
+8. **Feche perguntando o que vem agora**, em uma linha, sem enrolação:
+
+   > Salvo — 12 itens, R$ 187,40, no seu Drive.
+   > Quer **mandar outra nota**, **gerar a lista de compras** ou paramos por aqui?
+
+   Se ele pedir a lista → skill `gerador-lista-compras`.
+   Se ele mandar outra nota → recomece do passo 1.
+   Se ele encerrar → encerre. Não ofereça mais nada.
