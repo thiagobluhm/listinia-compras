@@ -29,8 +29,8 @@ que você fez por dentro.
 
 ## Análise (sempre que chamada)
 
-1. Carregue o `despensa.jsonl` real (skill `despensa-dados`, nunca um
-   novo) e calcule o estado atual.
+1. Carregue o estado real da despensa (skill `despensa-dados`, nunca
+   comece do zero).
 2. Liste os itens com status crítico ou baixo (mesma fórmula/limiares da
    skill `despensa-dados`), ordenados por Dias Restantes crescente.
 3. Responda em texto curto e direto: quais itens, há quantos dias restam,

@@ -32,7 +32,15 @@ Mesmo pipeline usado em produção no app Listinia real (`qrcode_reader.py` +
 
 O fluxo inteiro é: **ler → mostrar → confirmar → registrar → perguntar o
 que vem agora.** Nada além disso. Não gere dashboard, não calcule estoque,
-não faça análise de consumo aqui.
+não faça análise de consumo, não ofereça enviar por e-mail.
+
+## ⏱️ Rápido acima de tudo
+
+Registrar uma nota tem que levar segundos. Depois que o usuário confirmar,
+**grave e pare** — sem passo de conferência, sem recontar itens, sem medir
+arquivo, sem reler o que acabou de montar, sem resumo do que você fez por
+dentro. Cada passo extra aí vira minuto de espera pra quem está do outro
+lado com o celular na mão.
 
 ## Passo a passo
 
@@ -74,7 +82,7 @@ não faça análise de consumo aqui.
    Marque com `?` os itens que ficaram com campo `null`, pra ele corrigir
    se quiser.
 
-7. **Registre** com a skill `despensa-dados` (evento `compra`). Se o
+7. **Registre** com a skill `despensa-dados`. Se o
    usuário respondeu "registra", "pode salvar", "ok" ou equivalente,
    **registre tudo imediatamente**, incluindo os itens marcados com `?`
    (que entram com `null` + `obs`). Não repita a pergunta, não peça

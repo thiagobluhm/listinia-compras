@@ -1,6 +1,6 @@
 ---
 name: despensa-dados
-description: Manages the user's pantry (despensa) as an append-only JSONL event log — logs every approved purchase and manual adjustment, computes current quantity and days-of-stock-remaining per item using category shelf-life defaults, and can export the current state as an XLSX spreadsheet on demand. Use when the user asks to update the pantry, check what's running low or about to expire, adjust an item's quantity by hand, add or remove an item manually, wants a spreadsheet export, or right after a receipt has just been captured and confirmed.
+description: Manages the user's pantry (despensa) — keeps a compact current-state file (one line per product) plus write-once purchase records, computes days-of-stock-remaining per item using category shelf-life defaults, and can export the current state as an XLSX spreadsheet on demand. Use when the user asks to update the pantry, check what's running low or about to expire, adjust an item's quantity by hand, add or remove an item manually, wants a spreadsheet export, or right after a receipt has just been captured and confirmed.
 ---
 
 # Gestão da Despensa
@@ -21,189 +21,161 @@ Google Drive", "não consegui salvar agora".
 **Se der problema:** resolva sozinho. Se realmente não der, diga em UMA
 frase simples o que houve e o que você já vai fazer a respeito — nunca
 peça um código ou ID ao usuário, nunca ofereça opções técnicas, nunca
-liste as ferramentas que você tem. Ele não tem como responder isso e só
-vai se sentir perdido.
+liste as ferramentas que você tem.
 
 **Seja curto.** Duas ou três linhas por resposta bastam, sem relatório do
 que você fez por dentro.
 
-Esta skill é a **única** que lê e grava os arquivos de dados do plugin.
-As outras skills nunca gravam direto — sempre passam por aqui.
+---
 
-Tudo que você precisa está neste arquivo. **Não procure arquivos de
-referência, não faça buscas exploratórias, não peça permissão pra começar.**
-Registrar uma nota são 4 chamadas de ferramenta e deve levar segundos.
+## ⏱️ A regra que manda em tudo: velocidade
+
+Registrar uma nota tem que levar **segundos**, não minutos — e tem que
+continuar levando segundos na centésima nota.
+
+O que faz demorar não é o número de chamadas de ferramenta: é **a
+quantidade de texto que você precisa escrever**. Todo conteúdo de arquivo
+que você grava passa por você, palavra por palavra. Um arquivo de 20 KB
+custa minutos só de digitação.
+
+Por isso o desenho abaixo é **inegociável**:
+
+- ❌ **Nunca** leia o histórico inteiro de compras e reescreva ele todo.
+  Esse foi o erro que travava o plugin: o arquivo crescia a cada nota e o
+  tempo de gravação crescia junto, até ficar inviável.
+- ✅ O arquivo que você reescreve é **só o estado atual — uma linha por
+  produto**. Ele estabiliza em algumas dezenas de linhas (a família compra
+  sempre mais ou menos as mesmas coisas) e **para de crescer**.
+- ✅ O detalhe de cada compra vai para um arquivo próprio, escrito **uma
+  vez e nunca mais tocado**.
+
+### Proibido no caminho de gravar
+
+Nada de passos de conferência. Especificamente, **não faça**: contar
+linhas, medir tamanho de arquivo, converter para base64, imprimir o
+conteúdo "para conferir", reler o que acabou de montar, ou qualquer
+verificação intermediária. Monte o conteúdo e grave. Só isso.
 
 ---
 
-## 1. Onde os dados moram
+## 1. Onde salvar (nesta ordem)
 
-Quatro arquivos, todos no mesmo lugar:
+### Opção A — Pasta do usuário (a mais rápida, quando existir)
 
-| Arquivo | Conteúdo |
-|---|---|
-| `despensa.jsonl` | Log de eventos: compras, ajustes, checagens visuais |
-| `mercados.json` | Mercados preferidos (skill `pesquisa-encartes-mercado`) |
-| `config-habitos.json` | Frequência de compra e durações customizadas |
-| `Listinia - Dashboard.md` | Dashboard (skill `dashboard-despensa`) |
+Se esta sessão tiver acesso a uma pasta do usuário — um projeto do Cowork,
+uma pasta conectada, ou o Cowork rodando no computador dele — **use ela**.
+É a melhor opção porque permite **acrescentar linha no fim do arquivo**
+sem reescrever nada:
 
-**Se as ferramentas do Google Drive existirem nesta sessão, use o Drive e
-pronto** — não pergunte ao usuário onde salvar, não ofereça alternativas,
-não explique camadas. Só avise em uma linha o que fez ("salvei no seu
-Drive, pasta Listinia Compras"). Se o Drive não existir, veja a seção 6.
+```python
+with open(caminho, "a", encoding="utf-8") as f:
+    f.write(linha_nova + "\n")
+```
+
+Nesse modo o histórico completo pode crescer à vontade, porque acrescentar
+custa o mesmo sempre. Guarde tudo em `Listinia Compras/` dentro da pasta.
+
+### Opção B — Google Drive (padrão no celular)
+
+Sem pasta local, use o Google Drive — funciona igual em celular, web e
+desktop. Aqui **não dá pra acrescentar**, só substituir o arquivo inteiro;
+por isso o formato compacto da seção 2 é obrigatório.
+
+### Opção C — Sem nenhum dos dois
+
+Trabalhe normalmente e, no fim, entregue o arquivo da despensa com
+`SendUserFile`, explicando em duas linhas:
+
+> Não consegui salvar no seu Google Drive nesta conversa, então te mandei
+> a sua despensa aqui em cima — guarde esse arquivo e anexe na próxima vez
+> que a gente conversar, que eu continuo de onde paramos.
+
+Não pergunte nada, não ofereça opções: decida e siga.
 
 ---
 
-## 2. Receita do Google Drive (testada — siga exatamente)
+## 2. Os arquivos
 
-### 2.0 Primeiro: carregue as ferramentas pelo nome exato
+| Arquivo | O que é | Reescrito? |
+|---|---|---|
+| `despensa.jsonl` | **Estado atual: uma linha por produto** | Sim, toda vez — por isso tem que ser compacto |
+| `nota-AAAA-MM-DD-<mercado>.jsonl` | Detalhe item a item de uma compra | **Não. Escrito uma vez e nunca mais tocado** |
+| `mercados.json` | Mercados preferidos | Raro |
+| `config-habitos.json` | Frequência de compra e ajustes | Raro |
+| `Listinia - Dashboard.md` | Dashboard | Só quando pedido |
 
-Nesta sessão as ferramentas do Drive podem estar adormecidas (*deferred*)
-— aí elas **não aparecem** numa busca por palavra-chave, mesmo existindo.
-Carregue-as pelo nome exato, numa única chamada:
+### `despensa.jsonl` — uma linha por PRODUTO (não por compra)
 
-```
-ToolSearch: query = "select:mcp__Google_Drive__search_files,mcp__Google_Drive__create_file,mcp__Google_Drive__download_file_content,mcp__Google_Drive__trash_file"
-```
+Chaves curtas de propósito, para o arquivo ficar pequeno:
 
-**Só conclua que "não tem Google Drive" se ESSA chamada não trouxer as
-ferramentas.** Nunca conclua isso a partir de uma busca por palavra-chave
-que veio incompleta, e nunca a partir do que apareceu numa lista parcial —
-é exatamente aí que se erra e se abandona o Drive à toa.
-
-### 2.1 Achar a pasta (1ª chamada)
-
-```
-search_files:
-  query = "title = 'Listinia Compras' and mimeType = 'application/vnd.google-apps.folder'"
-  excludeContentSnippets = true
-```
-
-Achou → guarde o `id` como `PASTA_ID`.
-Não achou → crie e guarde o `id`:
-
-```
-create_file:
-  title = "Listinia Compras"
-  contentMimeType = "application/vnd.google-apps.folder"
-```
-
-### 2.2 Achar o arquivo (2ª chamada)
-
-```
-search_files:
-  query = "parentId = '<PASTA_ID>' and title = 'despensa.jsonl'"
-  excludeContentSnippets = true
-```
-
-Se voltar mais de um arquivo, use o de `createdTime` mais recente e mande
-os outros pro lixo com `trash_file` (é sobra de uma gravação interrompida).
-
-### 2.3 Ler o conteúdo (3ª chamada)
-
-```
-download_file_content: fileId = "<id do arquivo>"
-```
-
-Volta `content` em **base64** — decodifique pra texto (uma linha JSON por
-linha do arquivo).
-
-> ⚠️ Não use `read_file_content` — ela não suporta `text/plain` e vai
-> falhar com nossos arquivos.
-
-### 2.4 Gravar (4ª e 5ª chamadas)
-
-Não existe "sobrescrever" no Drive aqui. Gravar = **criar novo e descartar
-o velho**, nesta ordem (se a criação falhar, o antigo continua intacto):
-
-```
-create_file:
-  title = "despensa.jsonl"
-  parentId = "<PASTA_ID>"
-  contentMimeType = "text/plain"
-  disableConversionToGoogleType = true      ← OBRIGATÓRIO
-  textContent = "<conteúdo antigo + linhas novas>"
-```
-
-```
-trash_file: fileId = "<id do arquivo antigo>"
-```
-
-Só então diga ao usuário que salvou.
-
-### ⚠️ Três erros que travam tudo — nunca cometa
-
-1. **`update_file` não grava conteúdo.** Ela só renomeia ou move de pasta
-   (`title`, `parentId`). Não tem parâmetro de conteúdo. Chamar ela pra
-   salvar dado não salva nada.
-2. **Sem `disableConversionToGoogleType = true`, o Drive converte o
-   arquivo em Google Doc** — o `.jsonl` deixa de ser texto puro e a
-   leitura seguinte volta corrompida.
-3. **Não use `trashed` na query do `search_files`** — esse termo não
-   existe nessa ferramenta e quebra a busca. Não precisa: arquivo no lixo
-   já não aparece nos resultados.
-
-Os outros três arquivos (`mercados.json`, `config-habitos.json`,
-`Listinia - Dashboard.md`) seguem exatamente a mesma receita, mudando só o
-`title`. O `fileId` muda a cada gravação — nunca guarde um `fileId` de uma
-conversa pra outra, sempre reache por pasta + nome.
-
----
-
-## 3. Schema do `despensa.jsonl`
-
-Um JSON por linha. **Nunca edite nem apague uma linha existente — sempre
-acrescente no final.** O estado atual é sempre recalculado do histórico.
-
-**Compra** (uma linha por item de uma nota aprovada):
 ```json
-{"tipo": "compra", "data": "YYYY-MM-DD", "nota_numero": "...", "mercado": "...", "item": "Nome Normalizado", "categoria": "...", "qtd": 2, "unidade": "L", "preco_unitario": 5.50, "preco_total": 11.00}
+{"i":"Leite Integral 1L","c":"laticínios","q":2,"u":"L","cm":2,"uc":"2026-08-15","p":5.5}
 ```
 
-**Ajuste manual** (usuário corrigindo à mão):
+`i` item · `c` categoria · `q` quantidade atual · `u` unidade ·
+`cm` consumo médio · `uc` data da última compra · `p` último preço unitário.
+
+Nada além disso. Não acrescente campos "que podem ser úteis depois" — cada
+campo extra multiplica o tempo de gravação em toda nota futura.
+
+### `nota-AAAA-MM-DD-<mercado>.jsonl` — o detalhe da compra
+
+Uma linha por item comprado, escrita uma única vez:
+
 ```json
-{"tipo": "ajuste", "data": "YYYY-MM-DD", "item": "Nome Normalizado", "qtd_atual_nova": 1, "motivo": "uso manual"}
+{"data":"2026-08-15","mercado":"Mercadinho X","item":"Leite Integral 1L","categoria":"laticínios","qtd":2,"unidade":"L","preco_unitario":5.5,"preco_total":11.0}
 ```
 
-**Checagem visual** (skill `checagem-visual-despensa`):
-```json
-{"tipo": "checagem_visual", "data": "YYYY-MM-DD", "item": "Nome Normalizado", "confirmado_presente": true}
-```
+Campo ilegível na nota vai como `null` — nunca chute um valor.
 
-Campo que não deu pra ler na nota vai como `null` — nunca chute um valor.
-Pode acrescentar `"obs": "preço ilegível na nota"` quando útil.
+Esses arquivos são o histórico completo: se algum dia o estado atual ficar
+estranho, dá pra reconstruir tudo a partir deles.
 
 ---
 
-## 4. Registrar uma compra (o caminho quente)
+## 3. Registrar uma compra (o caminho quente)
 
-Chamado pela skill `captura-nota-fiscal` depois que o usuário confirmou.
+Chamado pela `captura-nota-fiscal` depois que o usuário confirmou.
 
-1. Ache a pasta e o arquivo (2.1, 2.2) e leia (2.3). Se o arquivo não
-   existe, é a primeira vez: parta de conteúdo vazio, sem cerimônia.
-2. Para cada item confirmado: normalize o nome (Title Case) e classifique
-   a categoria pela tabela da seção 5.
-3. Monte as linhas novas e grave o arquivo inteiro (antigo + novas), via
-   2.4.
-4. Responda curto: quantos itens entraram, o total da nota, e onde salvou.
-   Se algum item ficou com campo `null`, cite em uma linha só.
+1. Carregue o `despensa.jsonl` atual (é pequeno). Não existe ainda? Comece
+   vazio, sem cerimônia.
+2. **Em um único script Python**, aplique a nota sobre o estado:
+   - Para cada item: normalize o nome (Title Case) e classifique a
+     categoria pela tabela da seção 4.
+   - Produto já existe no estado (nome normalizado **exato**) →
+     `q = q + qtd_comprada`, `cm = qtd_comprada`, `uc = data da nota`,
+     `p = preço unitário`.
+   - Produto novo → acrescente a linha.
+3. Grave o `despensa.jsonl` novo e, separadamente, o arquivo de detalhe
+   daquela nota.
+4. Responda em duas linhas: quantos itens entraram, o total da nota, onde
+   salvou. Se algum campo ficou ilegível, cite em uma linha depois.
 
 **Se o usuário disser "registra" / "pode salvar" / "manda ver", registre
-tudo na hora** — inclusive os itens que ficaram ilegíveis (com `null` +
-`obs`). Não pare pra pedir confirmação de novo, não faça pergunta nova.
-Ele já decidiu. Cite as pendências depois de salvar, não antes.
+tudo na hora**, inclusive os itens ilegíveis (com `null`). Não pergunte de
+novo, ele já decidiu.
 
-**Não gere dashboard, não recalcule estoque, não faça análise depois de
-registrar** — só se o usuário pedir.
+**Depois de registrar, pare.** Não gere dashboard, não calcule dias
+restantes, não faça análise, não ofereça enviar por e-mail. Só se pedirem.
+
+### ⚠️ TRAVA — nunca some "de cabeça" nem por nome parecido
+
+1. **A conta é sempre por código** (o script do passo 2), nunca mental,
+   nem com poucos itens. É exatamente aí que erro entre datas acontece.
+2. **Casamento por nome normalizado EXATO.** "Leite Integral 1L" e "Leite
+   Desnatado 1L" são produtos DIFERENTES. Juntar dois nomes parecidos só
+   acontece **uma vez, na hora de registrar**, com o usuário confirmando —
+   nunca depois.
+3. **Só este passo altera quantidade.** Nenhuma outra skill recalcula ou
+   "ajusta" — elas apenas leem o estado.
 
 ---
 
-## 5. Categorias e duração de estoque
+## 4. Categorias e duração de estoque
 
-Portado do backend real do app Listinia (`categorizer.py`, `config.py`) —
-não invente outra taxonomia. Compare o nome do produto em minúsculo com as
-keywords, na ordem da tabela; a primeira que bater vence; nada bateu =
-`outros`.
+Portado do backend real do app Listinia (`categorizer.py`, `config.py`).
+Compare o nome do produto em minúsculo com as keywords, na ordem da
+tabela; a primeira que bater vence; nada bateu = `outros`.
 
 | Categoria | Dias | Keywords |
 |---|---|---|
@@ -220,92 +192,112 @@ keywords, na ordem da tabela; a primeira que bater vence; nada bateu =
 | pet | 30 | ração, petisco, areia para gato, coleira, vermífugo, antipulgas |
 | outros | 14 | fallback |
 
-**Farmácia** (nicho separado, não misture com supermercado): medicamentos
-(comprimido, cápsula, xarope, pomada, colírio, dipirona, ibuprofeno,
-paracetamol, antibiótico) · vitaminas & suplementos (vitamina, suplemento,
-ômega, probiótico, whey, colágeno, magnésio, zinco) · primeiros socorros
-(curativo, band-aid, micropore, atadura, gaze, seringa, termômetro, álcool
-gel) · higiene médica (soro, fralda, lenço umedecido) · outros (farmácia).
+**Farmácia** (nicho separado): medicamentos (comprimido, cápsula, xarope,
+pomada, colírio, dipirona, ibuprofeno, paracetamol, antibiótico) ·
+vitaminas & suplementos (vitamina, suplemento, ômega, probiótico, whey,
+colágeno, magnésio, zinco) · primeiros socorros (curativo, band-aid,
+micropore, atadura, gaze, seringa, termômetro, álcool gel) · higiene
+médica (soro, fralda, lenço umedecido) · outros (farmácia).
 
-Se o usuário customizou uma duração em `config-habitos.json`, o valor dele
-vence o da tabela. Frequência de compra padrão: `frequencia_dias = 7`.
-
----
-
-## 6. Sem Google Drive nesta sessão
-
-Só depois de tentar o passo 2.0 e realmente não ter as ferramentas.
-
-**Não pare, não pergunte nada, não ofereça opções.** Siga trabalhando
-normalmente e, no fim, entregue o arquivo da despensa com `SendUserFile`,
-com uma explicação humana em duas linhas:
-
-> Não consegui salvar no seu Google Drive nesta conversa, então te mandei
-> a sua despensa aqui em cima — guarde esse arquivo e anexe na próxima
-> vez que a gente conversar, que eu continuo de onde paramos.
-> (Se quiser que isso fique automático, é só conectar o Google Drive nas
-> configurações do Claude.)
-
-Nunca peça um código ou ID ao usuário. Nunca liste ferramentas. Nunca
-apresente "opção 1 / opção 2" técnica — decida você e siga.
-
-Se ele anexar o arquivo de uma conversa anterior, use como ponto de
-partida sem comentar nada sobre formato.
-
-Nunca prossiga fingindo que salvou quando não salvou.
+Duração customizada pelo usuário em `config-habitos.json` vence a tabela.
+Frequência de compra padrão: 7 dias.
 
 ---
 
-## 7. Calcular o estado atual (só quando pedido)
+## 5. Receita do Google Drive (testada)
 
-Rode **sempre por código** (Python lendo o JSONL linha a linha), nunca de
-cabeça. Agrupando por nome normalizado exato:
+### 5.0 Antes de tudo: carregue as ferramentas pelo nome exato
 
-1. **Qtd Atual** = soma das `qtd` dos eventos `compra` do item **desde o
-   último** `ajuste`/`checagem_visual` (que sobrescreve o acumulado até
-   ali: `qtd_atual_nova`, ou `0` se `confirmado_ausente`). Depois desse
-   ponto, volta a somar as compras seguintes.
-2. **Consumo Médio** = `qtd` da compra mais recente do item.
-3. **Última Compra** = data da compra mais recente.
+As ferramentas do Drive podem estar adormecidas — aí **não aparecem** numa
+busca por palavra-chave, mesmo existindo. Carregue-as de uma vez:
 
 ```
-dias_totais    = max(1, round((qtd_atual / consumo_medio) * duracao_categoria))
-previsao_fim   = ultima_compra + dias_totais dias
+ToolSearch: query = "select:mcp__Google_Drive__search_files,mcp__Google_Drive__create_file,mcp__Google_Drive__download_file_content,mcp__Google_Drive__trash_file"
+```
+
+**Só conclua que "não tem Google Drive" se ESSA chamada não trouxer as
+ferramentas.** Nunca a partir de uma lista parcial.
+
+### 5.1 Achar (ou criar) a pasta
+
+```
+search_files: query = "title = 'Listinia Compras' and mimeType = 'application/vnd.google-apps.folder'", excludeContentSnippets = true
+```
+
+Não achou → `create_file` com `title = "Listinia Compras"` e
+`contentMimeType = "application/vnd.google-apps.folder"`.
+
+### 5.2 Achar e ler um arquivo
+
+```
+search_files: query = "parentId = '<PASTA_ID>' and title = 'despensa.jsonl'", excludeContentSnippets = true
+download_file_content: fileId = "<id>"
+```
+
+Volta em base64 — decodifique. Voltou mais de um arquivo? Use o de
+`createdTime` mais recente e mande os outros pro lixo.
+
+### 5.3 Gravar
+
+Criar o novo primeiro, descartar o antigo depois (se falhar, o antigo
+continua intacto):
+
+```
+create_file:
+  title = "despensa.jsonl"
+  parentId = "<PASTA_ID>"
+  contentMimeType = "text/plain"
+  disableConversionToGoogleType = true      ← OBRIGATÓRIO
+  textContent = "<estado novo completo>"
+
+trash_file: fileId = "<id do antigo>"
+```
+
+Arquivo de detalhe de nota é só o `create_file` — não existe antigo pra
+descartar.
+
+### ⚠️ Três erros que travam tudo
+
+1. **`update_file` não grava conteúdo** — só renomeia ou move.
+2. **Sem `disableConversionToGoogleType = true`** o Drive converte o
+   arquivo em Google Doc e a leitura seguinte volta corrompida.
+3. **Não use `trashed` na query** — esse termo não existe e quebra a
+   busca. Arquivo no lixo já não aparece nos resultados.
+
+`read_file_content` não serve para esses arquivos — use
+`download_file_content`.
+
+O identificador do arquivo muda a cada gravação: sempre reache por pasta +
+nome, nunca guarde de uma conversa pra outra.
+
+---
+
+## 6. Dias restantes e status (só quando pedido)
+
+Sempre por código, a partir do estado atual:
+
+```
+dias_totais    = max(1, round((q / cm) * duracao_categoria))
+previsao_fim   = uc + dias_totais dias
 dias_restantes = max(0, (previsao_fim - hoje).dias)
 ```
 
 **Status**: `crítico` < 25% da duração da categoria · `baixo` 25–60% ·
 `ok` acima de 60%.
 
-### ⚠️ TRAVA — nunca some quantidade "de cabeça" ou por semelhança de nome
+---
 
-Se duas compras do mesmo item em **datas diferentes** forem somadas
-errado, ou se dois itens **parecidos mas diferentes** forem fundidos, o
-estoque sai errado e contamina lista de compras e dashboard.
+## 7. Ajuste manual
 
-1. **Calcule por código, nunca mentalmente** — mesmo com poucos itens. É
-   exatamente aí que o erro entre datas acontece.
-2. **Agrupe por nome normalizado EXATO**, não por "parece o mesmo
-   produto". "Leite Integral 1L" e "Leite Desnatado 1L" são itens
-   DIFERENTES. A normalização de nome acontece **uma vez, na hora de
-   registrar a compra**, com confirmação do usuário — nunca depois.
-3. **A soma só existe aqui, neste algoritmo.** Nenhuma outra skill pode
-   recalcular ou "ajustar" — elas só leem o resultado.
+"já usei metade do arroz", "tira o detergente da despensa" → altere o `q`
+daquele produto no estado (ou remova a linha) e grave. Sem cerimônia.
 
 ---
 
-## 8. Ajuste manual
+## 8. Exportar XLSX (só quando pedido)
 
-"já usei metade do arroz", "tira o detergente da despensa" →
-acrescente um evento `ajuste` com a nova quantidade (`0` se removido) e
-grave. Não apague linha nenhuma.
-
----
-
-## 9. Exportar XLSX (só quando pedido)
-
-Calcule o estado atual (seção 7) e gere um `.xlsx` com duas abas —
-**Compras** (todas as linhas `compra` do JSONL) e **Despensa** (estado
-atual, uma linha por item). Entregue com `SendUserFile`, seguindo a skill
-`xlsx`. Deixe claro que a planilha é uma fotografia do momento: a fonte de
-verdade continua sendo o `despensa.jsonl`.
+Gere um `.xlsx` com o estado atual (uma linha por produto, com dias
+restantes e status) e entregue via `SendUserFile`, seguindo a skill `xlsx`.
+Se o usuário quiser o histórico de compras junto, aí sim leia os arquivos
+de detalhe das notas. Deixe claro que a planilha é uma fotografia do
+momento.

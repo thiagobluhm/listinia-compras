@@ -47,8 +47,8 @@ Listinia (`/despensa/gerar-lista`) — não invente uma abordagem diferente.
    salve a resposta no mesmo lugar persistente. Default do app real, caso
    o usuário não saiba: `frequencia_dias = 7` (semanal).
 
-2. **Carregue o estado atual da despensa** (skill `despensa-dados` — a
-   partir do `despensa.jsonl` real, nunca do zero). Um item é candidato se
+2. **Carregue o estado atual da despensa** (skill `despensa-dados` — o
+   estado real dele, nunca do zero). Um item é candidato se
    `Dias Restantes <= frequencia_dias` — ou seja, vai acabar antes da
    próxima ida ao mercado.
 

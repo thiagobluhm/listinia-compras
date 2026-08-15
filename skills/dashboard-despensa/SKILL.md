@@ -41,8 +41,8 @@ uma nota por conta própria — isso deixa a captura lenta à toa.
 
 ## Fonte de dados
 
-Carregue o `despensa.jsonl` real (skill `despensa-dados` — nunca leia um
-arquivo novo/vazio) e calcule o estado atual a partir dele. Nunca invente
+Carregue o estado real da despensa (skill `despensa-dados` — nunca leia
+um arquivo novo/vazio). Nunca invente
 números: se uma seção não tiver dados suficientes (ex.: usuário ainda não
 registrou nenhuma compra), mostre um estado vazio explicando o que falta,
 em vez de estimar.
