@@ -40,11 +40,14 @@ periodicamente ou sem o usuário estar ativamente pedindo a lista.
 1. **Receba as fotos.** Pode ser uma foto da geladeira aberta e outra da
    despensa/armário — quantas o usuário quiser mandar.
 
-2. **Identifique os itens visíveis em cada foto.** Você lê imagens
-   nativamente, sem precisar de OCR externo. Liste o que reconhecer com
-   confiança (ex.: "Leite Integral", "Ovos", "Detergente", "Arroz").
-   Não force reconhecimento de itens pouco claros — se não tem certeza,
-   não liste.
+2. **Identifique os itens visíveis — UMA olhada por foto.** Você lê
+   imagens nativamente. Liste o que reconhecer com confiança (ex.: "Leite
+   Integral", "Ovos", "Detergente", "Arroz").
+
+   **Proibido** recortar, fatiar, ampliar, girar ou tratar a imagem para
+   "enxergar melhor", e proibido reler a mesma foto várias vezes. Item que
+   não dá pra ver claramente não entra na lista. Se a foto inteira estiver
+   ruim, peça outra em vez de insistir.
 
 3. **Carregue a despensa real** (skill `despensa-dados` — o estado real e
    persistente, nunca do zero) e compare item a item:
