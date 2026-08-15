@@ -19,13 +19,25 @@ por dentro.
 houve e o que fazer. Nunca peça código ou ID, nunca ofereça opções
 técnicas, nunca liste ferramentas.
 
-**Seja curto.** Duas ou três linhas por resposta bastam.
+**Seja curto.** Fora as três perguntas obrigatórias da seção seguinte, duas
+ou três linhas por resposta bastam.
+
+---
+
+## ✅ Progresso visível — obrigatório
+
+Assim que a captura começar, crie uma lista de etapas (ferramenta de
+tarefas) com os passos previstos ("Ler nota", "Conferir itens",
+"Registrar ou entregar") e marque cada uma como concluída assim que
+terminar. Isso substitui narrar cada passo em texto — o usuário acompanha
+pela lista, não por parágrafo.
 
 ---
 
 ## ⛔ O limite mais importante desta skill
 
-**Existe UM método: o QR code. A foto é exceção, e é UMA olhada só.**
+**Existe UM método pra ler o papel: o QR code. A foto é exceção, e é UMA
+olhada só.**
 
 É terminantemente proibido:
 
@@ -43,18 +55,62 @@ possível neste plugin. Uma foto nova custa cinco segundos pro usuário.
 
 ---
 
+## ❗ Três perguntas obrigatórias — regra absoluta, nunca pule
+
+Diferente do resto do plugin (que evita ficar perguntando), estas três
+perguntas são **mandatórias**, mesmo que pareçam repetir algo óbvio. Cada
+uma tem seu ponto certo no fluxo — não antecipe nem misture.
+
+### Pergunta 1 — método, sempre no início
+
+Antes de tentar ler qualquer coisa, **sempre pergunte**, mesmo que já
+tenha vindo uma foto anexada (o cupom inteiro costuma trazer o QR code
+junto, no rodapé — por isso a escolha importa mesmo com a foto em mãos):
+
+> Quer que eu leia pelo **QR code** da nota (mais rápido e exato) ou pela
+> **foto do cupom**?
+
+Só pule esta pergunta se o próprio usuário já disse na mesma mensagem qual
+caminho quer (ex.: "lê o QR code dessa nota").
+
+- Escolheu QR code → vá para a leitura do QR (regra dos 3 comandos,
+  abaixo). Se não achar QR legível, **não caia para a leitura de foto
+  sozinho** — avise que não achou o QR e pergunte se quer tentar pela foto
+  do cupom ou mandar uma foto melhor do QR.
+- Escolheu foto/cupom → vá direto para "Sem QR: uma olhada na foto".
+
+### Pergunta 2 — itens ilegíveis, assim que aparecerem
+
+Se sobrar item que você não conseguiu ler com confiança (nome, quantidade
+ou preço), **pare aí** — não monte uma lista com `?` e siga sozinho até o
+fim. Pergunte:
+
+> Não consegui ler [X itens / o valor de tal item] — quer completar lendo
+> na nota, ou eu sigo sem esses itens?
+
+Espere a resposta antes de seguir. Se o usuário completar, use o valor que
+ele der. Se disser pra seguir sem eles, remova esses itens da lista — não
+os leve adiante como `null`.
+
+### Pergunta 3 — registrar ou só entregar, na confirmação final
+
+Depois que a lista de itens estiver fechada (completa, ou já sem os itens
+descartados na pergunta 2), pergunte:
+
+> Quer que eu **registre isso na sua despensa**, ou prefere só que eu
+> **te entregue a nota organizada**, sem salvar nada?
+
+- Registrar → siga para o passo de registro, usando a skill
+  `despensa-dados`.
+- Só entregar → monte a tabela final e entregue (mensagem ou arquivo, o
+  que fizer mais sentido), sem gravar nada na despensa. Não pergunte de
+  novo depois disso.
+
+---
+
 ## Passo a passo
 
-### 1. Peça a foto do QR code (não da nota inteira)
-
-Se o usuário ainda não anexou nada, peça assim:
-
-> Manda uma foto do **QR code** da nota — só ele, de perto. Não precisa
-> fotografar o cupom inteiro, mesmo que ele seja comprido.
-
-Isso é verdade: com o QR code eu pego a lista completa de itens direto na
-Receita, com preço exato. Cupom comprido fotografado inteiro quase nunca
-dá pra ler, e é exatamente o caso em que erro acontece.
+### 1. Pergunta 1 (método) — ver seção acima
 
 ### 2. Leia o QR code — UM comando, uma vez
 
@@ -64,7 +120,8 @@ script pode tentar mais de uma biblioteca (`zxing-cpp`, `pyzbar`,
 por vez. Se faltar biblioteca, instale junto no mesmo comando
 (`pip install ... --break-system-packages`).
 
-Saiu uma URL → passo 3. Não saiu → passo 5.
+Saiu uma URL → passo 3. Não saiu → veja a ramificação da Pergunta 1
+(avisar e perguntar, nunca cair sozinho pra foto).
 
 ### 3. Abra a página da Receita
 
@@ -74,22 +131,24 @@ de extrair. Pegue estabelecimento, data, itens (quantidade, unidade,
 preço) e total.
 
 Não carregou em ~30 segundos, ou veio quase vazia? **Não tente de novo, não
-tente outro caminho.** Vá pro passo 5.
+tente outro caminho.** Avise e pergunte se quer tentar pela foto do cupom.
 
 ### 4. Se veio da Receita, os dados são confiáveis
 
 Normalize os nomes pra algo legível ("LEITE INTEG UHT 1L" → "Leite
-Integral 1L") e siga pro passo 6.
+Integral 1L"). Se algum item ainda ficou ambíguo mesmo vindo da Receita,
+use a Pergunta 2. Senão, siga para a Pergunta 3.
 
-### 5. Sem QR: UMA olhada na foto, e ponto
+### 5. Sem QR (ou usuário escolheu foto): uma olhada, e ponto
 
 Olhe a imagem **como ela está**, inteira, uma única vez, e extraia o que
 der pra ler com confiança. Sem recorte, sem ampliação, sem tratamento,
 sem segunda olhada.
 
-- **Deu pra ler os itens?** Siga pro passo 6, avisando em uma linha que
-  leu do papel e que vale conferir os valores.
-- **Não deu?** Pare aqui e diga, sem rodeio:
+- **Deu pra ler os itens?** Aplique a Pergunta 2 para o que sobrar
+  ilegível, avisando em uma linha que leu do papel e que vale conferir os
+  valores. Depois siga para a Pergunta 3.
+- **Não deu ler quase nada?** Pare aqui e diga, sem rodeio:
 
   > Não consegui ler essa foto — ficou desfocada / o cupom está apagado.
   > Tenta bater outra? O melhor é focar no **QR code** da nota, de perto,
@@ -97,16 +156,16 @@ sem segunda olhada.
 
   E encerre a tentativa. **Não tente contornar.**
 
-### 6. Mostre e confirme — uma vez só
+### 6. Mostre a lista final
 
-Tabela compacta com os itens. Marque com `?` o que ficou duvidoso, pra ele
-corrigir se quiser. Uma pergunta só: "pode registrar?".
+Tabela compacta com os itens já resolvidos (sem `?` pendente — a Pergunta
+2 já cuidou disso). Aplique a Pergunta 3 antes de fazer qualquer coisa com
+os dados.
 
-### 7. Registre e pare
+### 7. Registre (se foi essa a escolha) e pare
 
-Use a skill `despensa-dados`. Se ele disse "registra", "pode salvar", "ok"
-ou equivalente, **registre tudo na hora**, incluindo os itens com `?` (que
-entram sem o valor faltando). Não pergunte de novo.
+Use a skill `despensa-dados`. Registre tudo na hora, sem perguntar de
+novo — a decisão já foi tomada na Pergunta 3.
 
 Depois de gravar: **pare.** Sem conferência, sem recontagem, sem dashboard,
 sem cálculo de estoque, sem oferecer e-mail, sem relatório do que você fez.
@@ -116,14 +175,19 @@ sem cálculo de estoque, sem oferecer e-mail, sem relatório do que você fez.
 > Salvo — 12 itens, R$ 187,40, no seu Drive.
 > Quer **mandar outra nota**, **gerar a lista de compras**, ou paramos por aqui?
 
+(Se a escolha da Pergunta 3 foi "só entregar", troque a primeira linha por
+uma confirmação de que a nota foi entregue, sem mencionar despensa.)
+
 Pediu a lista → skill `gerador-lista-compras`. Outra nota → volta ao passo
-1. Encerrou → encerre, sem oferecer mais nada.
+1 (Pergunta 1 de novo, é uma nota nova). Encerrou → encerre, sem oferecer
+mais nada.
 
 ---
 
 ## Nunca invente
 
 Preço, quantidade ou nome que você não leu com clareza **não entra
-chutado**. Entra sem o valor, marcado, ou não entra. Uma despensa com
-número errado estraga a lista de compras e o controle de gasto inteiro —
-é melhor faltar dado do que ter dado falso.
+chutado**. Com a Pergunta 2 isso nunca deveria acontecer — mas se algum
+campo escapar sem confirmação, ele entra vazio/marcado, nunca com um valor
+inventado. Uma despensa com número errado estraga a lista de compras e o
+controle de gasto inteiro — é melhor faltar dado do que ter dado falso.

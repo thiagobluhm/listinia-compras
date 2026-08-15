@@ -151,9 +151,17 @@ Chamado pela `captura-nota-fiscal` depois que o usuário confirmou.
 4. Responda em duas linhas: quantos itens entraram, o total da nota, onde
    salvou. Se algum campo ficou ilegível, cite em uma linha depois.
 
-**Se o usuário disser "registra" / "pode salvar" / "manda ver", registre
-tudo na hora**, inclusive os itens ilegíveis (com `null`). Não pergunte de
-novo, ele já decidiu.
+**Quando chamada pela `captura-nota-fiscal`, a confirmação já aconteceu
+antes de chegar aqui** — aquela skill pergunta obrigatoriamente se o
+usuário quer registrar, e resolve todo item ilegível com o usuário antes
+de te passar a lista. Por isso: **registre tudo na hora**, sem perguntar
+de novo e sem esperar item com `?` pendente — se algum ainda chegar
+incompleto, é porque o usuário decidiu seguir sem aquele dado, então grave
+como está (nunca invente o valor faltante).
+
+Se você for chamada fora desse fluxo (ajuste manual, por exemplo) e o
+usuário disser "registra" / "pode salvar" / "manda ver", vale a mesma
+regra: registre na hora, não pergunte de novo.
 
 **Depois de registrar, pare.** Não gere dashboard, não calcule dias
 restantes, não faça análise, não ofereça enviar por e-mail. Só se pedirem.

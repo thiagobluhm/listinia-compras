@@ -1,98 +1,103 @@
 # Listinia Compras
 
-Plugin de Cowork para gestão pessoal de despensa: captura notas fiscais
-(por QR code ou foto), reconhece o que ainda tem na geladeira/despensa por
-foto, mantém um registro de compras e um dashboard sempre atualizados,
-gera listas de compras baseadas no seu consumo real, e pesquisa preços em
-encartes de supermercado.
+A Cowork plugin for personal pantry management: captures grocery receipts
+(via QR code or photo), recognizes what's still in your fridge/pantry from
+photos, keeps an always-up-to-date purchase log and dashboard, generates
+shopping lists based on your real consumption, and researches prices in
+supermarket flyers.
 
-Este plugin é um companheiro **standalone** ao produto Listinia (não
-depende do backend/SaaS Listinia estar no ar) e foi desenhado para
-funcionar **igual em qualquer canal — celular, web ou desktop**, já que a
-maioria das pessoas usa o Cowork pelo celular. Veja a seção "Persistência
-dos dados" abaixo antes de usar no dia a dia.
+This plugin is a **standalone** companion to the Listinia product (it does
+not depend on the Listinia backend/SaaS being online) and was designed to
+work **identically across any channel — mobile, web, or desktop** — since
+most people use Cowork from their phone. See the "Data persistence"
+section below before using it day to day.
 
-## O que ele faz
+## What it does
 
-| Skill | O que faz |
+| Skill | What it does |
 |---|---|
-| `captura-nota-fiscal` | Lê o QR code da nota (Playwright abre a página da SEFAZ) ou, se não der, lê a foto direto. Extrai os itens da compra. |
-| `checagem-visual-despensa` | Reconhece itens em fotos da geladeira/despensa e confirma com você o que já acabou, como parte de gerar a lista de compras. |
-| `despensa-dados` | Mantém o registro de compras e o estoque atual por item (formato JSONL), com categoria e dias restantes de estoque. Exporta como XLSX sob demanda. |
-| `dashboard-despensa` | Dashboard em Markdown, sempre atualizado, com gasto por categoria, top produtos, mercados mais usados e itens acabando. Renderiza em qualquer canal. |
-| `gerador-lista-compras` | Gera a lista de compras da próxima ida ao mercado, baseada no consumo real e na sua frequência de compra. |
-| `pesquisa-encartes-mercado` | Cadastra seus 3–5 mercados preferidos e pesquisa preços atuais nos sites deles via Playwright, cruzando com sua lista de compras. |
-| `alerta-estoque-baixo` | Verifica o que está acabando e, se você quiser, agenda uma checagem recorrente com notificação. |
+| `captura-nota-fiscal` | Reads the receipt's QR code (Playwright opens the official tax-authority page) or, if that fails, reads the photo directly. Extracts the purchased items. |
+| `checagem-visual-despensa` | Recognizes items in fridge/pantry photos and confirms with you what's already run out, as part of generating the shopping list. |
+| `despensa-dados` | Keeps the purchase log and current stock per item (JSONL format), with category and days-of-stock-remaining. Exports to XLSX on request. |
+| `dashboard-despensa` | Always-up-to-date Markdown dashboard with spend by category, top products, most-used markets, and low-stock items. Renders in any channel. |
+| `gerador-lista-compras` | Generates the shopping list for your next market trip, based on real consumption and your purchase cadence. |
+| `pesquisa-encartes-mercado` | Registers your 3–5 preferred supermarkets and researches current prices on their sites via Playwright, cross-referencing your shopping list. |
+| `alerta-estoque-baixo` | Checks what's running low and, if you want, schedules a recurring check with a notification. |
 
-## Como usar
+## How to use it
 
-1. Fotografe ou anexe uma nota fiscal e diga algo como "captura essa nota".
-2. Depois de algumas compras, peça "monta minha lista de compras" ou "como
-   tá minha despensa". Se quiser mais precisão, anexe fotos da geladeira e
-   da despensa junto do pedido da lista — o plugin confirma com você o que
-   ainda tem antes de fechar a lista.
-3. Na primeira vez que pedir preços, o Cowork vai te perguntar quais
-   mercados você usa (nome, endereço, site, página de ofertas).
-4. Peça o dashboard quando quiser ver o panorama geral de gastos.
-5. Peça a planilha (`.xlsx`) quando quiser abrir os dados no Excel.
+1. Photograph or attach a receipt and say something like "capture this receipt."
+2. After a few purchases, ask "build my shopping list" or "how's my pantry doing?" For more accuracy, attach photos of your fridge and pantry along with the list request — the plugin confirms with you what's still on hand before finalizing the list.
+3. The first time you ask for prices, Cowork will ask which markets you shop at (name, address, website, offers page).
+4. Ask for the dashboard whenever you want the overall spending picture.
+5. Ask for the spreadsheet (`.xlsx`) when you want to open the data in Excel.
 
-## Arquivos que o plugin gera
+## Files the plugin generates
 
-- `despensa.jsonl` — log de eventos (compras, ajustes, checagens visuais); é a fonte de verdade
-- `despensa.xlsx` — exportação sob demanda, gerada a partir do JSONL, não é a fonte de verdade
-- `mercados.json` — mercados preferidos cadastrados
-- `config-habitos.json` — frequência de compra e durações de categoria personalizadas
-- `Listinia - Dashboard.md` — dashboard em Markdown, sempre atualizado
+- `despensa.jsonl` — current pantry state, one line per product; the source of truth for stock levels
+- `nota-YYYY-MM-DD-<market>.jsonl` — line-item detail of a single purchase, written once and never rewritten
+- `despensa.xlsx` — on-demand export generated from the JSONL data; not the source of truth
+- `mercados.json` — registered preferred markets
+- `config-habitos.json` — purchase frequency and any custom category durations
+- `Listinia - Dashboard.md` — always-up-to-date Markdown dashboard
 
-## ⚠️ Persistência dos dados (importante)
+## ⚠️ Data persistence (important)
 
-Cada conversa nova do Cowork começa do zero — a maioria das pessoas usa o
-Cowork pelo celular, sem nenhum dispositivo conectado. Para os dados não
-"resetarem" a cada chat:
+Every new Cowork conversation starts from scratch — most people use Cowork
+from their phone, with no device connected. So your data doesn't "reset"
+on every chat, the plugin persists it in one of two ways, in order of
+preference:
 
-**Com o Google Drive conectado (recomendado):** os arquivos ficam numa
-pasta chamada `Listinia Compras` no seu Drive e são lidos e atualizados
-automaticamente a cada conversa — celular, web ou desktop, tanto faz.
-Depois de conectar o Drive uma vez (nas configurações de conectores do
-Claude), não há nada manual a fazer.
+**A connected local folder (fastest, when available):** if the session
+has access to a folder on your computer — a Cowork project, a connected
+folder, or Cowork running directly on your machine — the plugin uses it
+directly. This is the best option because purchase history can grow
+without ever slowing down, since new records are appended rather than
+rewritten.
 
-**Sem Google Drive:** o plugin continua funcionando, mas a persistência
-passa a ser manual — no fim da conversa você recebe o arquivo atualizado
-pra guardar e reanexa no começo da próxima. Dá mais trabalho e tem mais
-chance de erro humano, então vale conectar o Drive se puder. O plugin
-nunca obriga: se não tiver, avisa e segue.
+**Google Drive (default on mobile):** without a local folder, the plugin
+uses Google Drive — works the same on mobile, web, or desktop. Once you've
+connected Drive (in Claude's connector settings), there's nothing manual
+to do afterward.
 
-A checagem de estoque agendada (`alerta-estoque-baixo`) só funciona com o
-Drive conectado — uma tarefa agendada roda numa sessão nova, onde não há
-como anexar arquivo.
+**Neither available:** the plugin still works, but persistence becomes
+manual — at the end of the conversation you receive the updated file to
+keep and re-attach at the start of the next one. More work and more room
+for human error, so it's worth connecting a folder or Drive if you can.
+The plugin never insists: if neither is available, it says so and moves
+on.
 
-## Dependência técnica
+The scheduled low-stock check (`alerta-estoque-baixo`) only works with
+Google Drive connected — a scheduled task runs in a brand-new session,
+where there's no way to attach a file.
 
-Este plugin usa o servidor MCP oficial do Playwright (`@playwright/mcp`,
-via `npx`) para abrir páginas da SEFAZ e sites de supermercado — requer
-Node.js disponível no ambiente onde o Cowork roda (normalmente já presente
-no sandbox do Cowork). Para persistência automática (Camada 1), requer o
-conector do Google Drive conectado na conta do Claude — opcional, mas
-recomendado.
+## Technical dependency
 
-## Origem das regras de negócio
+This plugin uses the official Playwright MCP server (`@playwright/mcp`,
+via `npx`) to open tax-authority receipt pages and supermarket sites — it
+requires Node.js to be available in the environment where Cowork runs
+(normally already present in the Cowork sandbox). Automatic persistence
+via a connected local folder requires no extra setup; the Google Drive
+fallback requires the Google Drive connector to be connected on your
+Claude account — optional, but recommended.
 
-As categorias de produto, as durações padrão de estoque por categoria
-(ex.: hortifrúti 5 dias, laticínios 10, limpeza 45) e a fórmula de dias
-restantes foram portadas diretamente do backend real do app Listinia do
-autor (`categorizer.py`, `config.py`, `despensa.py`), para manter
-consistência com um sistema já validado em produção, em vez de valores
-inventados.
+## Where the business rules come from
 
-## Autoria
+Product categories, default stock-duration-per-category values (e.g.,
+produce 5 days, dairy 10, cleaning supplies 45), and the days-remaining
+formula were ported directly from the author's real Listinia app backend
+(`categorizer.py`, `config.py`, `despensa.py`), to stay consistent with a
+system already validated in production rather than invented values.
 
-Desenvolvido por Thiago Bluhm — AIstein LTDA.
+## Author
 
-## Roadmap (fora do escopo desta versão)
+Built by Thiago Bluhm — AIstein LTDA.
 
-A pesquisa de encartes hoje é feita ao vivo, via scraping. A ideia é que,
-futuramente, isso evolua para um MCP dedicado conectando diretamente ao
-marketplace de ofertas do backend Listinia (onde supermercados cadastrados
-competem por oferta), e a persistência possa opcionalmente usar o backend
-real do Listinia em vez do Google Drive, para quem tiver conta no app.
-Esse MCP ainda não existe e não faz parte deste plugin.
+## Roadmap (out of scope for this version)
+
+Flyer research is currently done live via web scraping. The plan is for
+this to eventually evolve into a dedicated MCP connecting directly to the
+Listinia backend's offers marketplace (where registered supermarkets
+compete for demand), and for persistence to optionally use the real
+Listinia backend instead of Google Drive, for users with a Listinia
+account. That MCP doesn't exist yet and isn't part of this plugin.
