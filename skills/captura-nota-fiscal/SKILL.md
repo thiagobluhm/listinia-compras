@@ -46,12 +46,22 @@ olhada só.**
   "conseguir ler melhor";
 - ❌ ler a nota em pedaços e juntar os pedaços;
 - ❌ tentar de novo com outra abordagem depois de falhar;
-- ❌ passar de **3 comandos no total** para extrair a nota.
+- ❌ passar de **3 comandos no total** para extrair a nota;
+- ❌ **montar a URL da nota "na mão" a partir da chave de acesso, ou usar
+  busca/`web_fetch`/qualquer outra ferramenta pra tentar consultar a nota
+  por fora do Playwright.** Isso não é um "caminho alternativo válido" —
+  é exatamente o "tentar de novo com outra abordagem" proibido acima, só
+  que disfarçado. A Receita só é confiável pela página oficial carregada
+  via Playwright; qualquer outro jeito de "adivinhar" o conteúdo é o
+  mesmo risco de inventar dado que a foto picotada.
 
-Se não deu pra ler, **não insista: peça outra foto.** Ficar dez minutos
-tentando decifrar um cupom desbotado não é persistência — é o caminho
-direto pra inventar item e preço que não existem, que é o pior erro
-possível neste plugin. Uma foto nova custa cinco segundos pro usuário.
+Se não deu pra ler — **de qualquer forma que seja: QR ilegível, página não
+carregou, ou a própria ferramenta do Playwright não estava disponível
+nesta sessão** — **não insista: peça outra foto.** Ficar dez minutos
+tentando decifrar um cupom desbotado, ou inventando um jeito alternativo
+de bater na Receita, não é persistência — é o caminho direto pra inventar
+item e preço que não existem, que é o pior erro possível neste plugin.
+Uma foto nova custa cinco segundos pro usuário.
 
 ---
 
@@ -130,8 +140,17 @@ carrega o conteúdo depois do load inicial, então espere ela popular antes
 de extrair. Pegue estabelecimento, data, itens (quantidade, unidade,
 preço) e total.
 
-Não carregou em ~30 segundos, ou veio quase vazia? **Não tente de novo, não
-tente outro caminho.** Avise e pergunte se quer tentar pela foto do cupom.
+**As ferramentas do Playwright nem aparecem, ou pedem conexão com
+dispositivo/navegador que não existe nesta sessão?** Trate isso do mesmo
+jeito que "não carregou" — não é um problema pra contornar com outra
+ferramenta, é o sinal de parar. Nunca tente `web_fetch`, busca na web, ou
+montar a URL manualmente como substituto — isso está proibido acima.
+
+Não carregou em ~30 segundos, veio quase vazia, ou a ferramenta não estava
+disponível? **Não tente de novo, não tente outro caminho.** Avise e
+pergunte se quer tentar pela foto do cupom (deixando claro, se for o
+caso, que a foto que ele já mandou pode ser só parte do cupom — pergunte
+se aquela foto é a nota inteira antes de assumir que sim).
 
 ### 4. Se veio da Receita, os dados são confiáveis
 
@@ -144,6 +163,12 @@ use a Pergunta 2. Senão, siga para a Pergunta 3.
 Olhe a imagem **como ela está**, inteira, uma única vez, e extraia o que
 der pra ler com confiança. Sem recorte, sem ampliação, sem tratamento,
 sem segunda olhada.
+
+Antes de seguir, confira se a foto parece ser o cupom **inteiro**: se a
+numeração dos itens não começa em 001, ou o valor total não bate com a
+soma dos itens visíveis, é sinal de que a foto é só um pedaço do papel.
+Nesse caso trate como "não deu pra ler direito" (abaixo) — não registre
+uma fração da compra como se fosse a nota completa.
 
 - **Deu pra ler os itens?** Aplique a Pergunta 2 para o que sobrar
   ilegível, avisando em uma linha que leu do papel e que vale conferir os
