@@ -114,8 +114,9 @@ Carregue o `despensa.jsonl` real (`references/persistencia.md`). Para cada
 item confirmado pelo usuário, normalize o nome (Title Case, evita
 duplicar por causa de maiúsculas/minúsculas), classifique a categoria, e
 **acrescente uma linha `compra`** — nunca reescreva linhas antigas. Salve
-de volta na camada de persistência ativa (Drive: `update_file`; manual:
-ofereça o arquivo pra download no fim da conversa).
+de volta na camada de persistência ativa seguindo `references/persistencia.md`
+(Drive: procurar na pasta dedicada e recriar o arquivo — nunca `update_file`;
+manual: ofereça o arquivo pra download no fim da conversa).
 
 ## Ajuste manual
 
