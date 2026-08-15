@@ -5,6 +5,28 @@ description: Manages the user's pantry (despensa) as an append-only JSONL event 
 
 # Gestão da Despensa
 
+## 🗣️ Como falar (regra que vale para tudo abaixo)
+
+Quem usa este plugin é uma pessoa comum organizando as compras de casa —
+não um programador. A conversa tem que parecer um assistente prestativo,
+nunca um terminal.
+
+**Nunca escreva na resposta:** nome de ferramenta, ID de arquivo, trecho de
+código, JSON, "JSONL", "base64", "camada", nome técnico de arquivo, ou
+explicação de como você funciona por dentro.
+
+**Fale assim:** "sua despensa", "sua lista de compras", "salvei no seu
+Google Drive", "não consegui salvar agora".
+
+**Se der problema:** resolva sozinho. Se realmente não der, diga em UMA
+frase simples o que houve e o que você já vai fazer a respeito — nunca
+peça um código ou ID ao usuário, nunca ofereça opções técnicas, nunca
+liste as ferramentas que você tem. Ele não tem como responder isso e só
+vai se sentir perdido.
+
+**Seja curto.** Duas ou três linhas por resposta bastam, sem relatório do
+que você fez por dentro.
+
 Esta skill é a **única** que lê e grava os arquivos de dados do plugin.
 As outras skills nunca gravam direto — sempre passam por aqui.
 
@@ -33,6 +55,21 @@ Drive, pasta Listinia Compras"). Se o Drive não existir, veja a seção 6.
 ---
 
 ## 2. Receita do Google Drive (testada — siga exatamente)
+
+### 2.0 Primeiro: carregue as ferramentas pelo nome exato
+
+Nesta sessão as ferramentas do Drive podem estar adormecidas (*deferred*)
+— aí elas **não aparecem** numa busca por palavra-chave, mesmo existindo.
+Carregue-as pelo nome exato, numa única chamada:
+
+```
+ToolSearch: query = "select:mcp__Google_Drive__search_files,mcp__Google_Drive__create_file,mcp__Google_Drive__download_file_content,mcp__Google_Drive__trash_file"
+```
+
+**Só conclua que "não tem Google Drive" se ESSA chamada não trouxer as
+ferramentas.** Nunca conclua isso a partir de uma busca por palavra-chave
+que veio incompleta, e nunca a partir do que apareceu numa lista parcial —
+é exatamente aí que se erra e se abandona o Drive à toa.
 
 ### 2.1 Achar a pasta (1ª chamada)
 
@@ -197,15 +234,23 @@ vence o da tabela. Frequência de compra padrão: `frequencia_dias = 7`.
 
 ## 6. Sem Google Drive nesta sessão
 
-Se as ferramentas do Drive não existirem:
+Só depois de tentar o passo 2.0 e realmente não ter as ferramentas.
 
-1. Pergunte uma vez se ele tem o `despensa.jsonl` de uma conversa anterior
-   pra anexar. Se anexar, use como ponto de partida.
-2. Trabalhe normalmente e, ao final, entregue o arquivo atualizado com
-   `SendUserFile`, avisando que ele precisa guardar e reanexar na próxima
-   conversa.
-3. Ofereça, em uma linha, conectar o Google Drive pra isso ficar
-   automático — sem insistir e sem bloquear o uso.
+**Não pare, não pergunte nada, não ofereça opções.** Siga trabalhando
+normalmente e, no fim, entregue o arquivo da despensa com `SendUserFile`,
+com uma explicação humana em duas linhas:
+
+> Não consegui salvar no seu Google Drive nesta conversa, então te mandei
+> a sua despensa aqui em cima — guarde esse arquivo e anexe na próxima
+> vez que a gente conversar, que eu continuo de onde paramos.
+> (Se quiser que isso fique automático, é só conectar o Google Drive nas
+> configurações do Claude.)
+
+Nunca peça um código ou ID ao usuário. Nunca liste ferramentas. Nunca
+apresente "opção 1 / opção 2" técnica — decida você e siga.
+
+Se ele anexar o arquivo de uma conversa anterior, use como ponto de
+partida sem comentar nada sobre formato.
 
 Nunca prossiga fingindo que salvou quando não salvou.
 
