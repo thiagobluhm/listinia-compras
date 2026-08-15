@@ -18,9 +18,9 @@ section below before using it day to day.
 |---|---|
 | `captura-nota-fiscal` | Reads the receipt's QR code (Playwright opens the official tax-authority page) or, if that fails, reads the photo directly. Extracts the purchased items. |
 | `checagem-visual-despensa` | Recognizes items in fridge/pantry photos and confirms with you what's already run out, as part of generating the shopping list. |
-| `despensa-dados` | Keeps the purchase log and current stock per item (JSONL format), with category and days-of-stock-remaining. Exports to XLSX on request. |
+| `despensa-dados` | Keeps the purchase log and current stock per item (JSONL format), with category and days-of-stock-remaining. Detects a likely duplicate receipt before saving. Exports to XLSX on request. |
 | `dashboard-despensa` | Always-up-to-date Markdown dashboard with spend by category, top products, most-used markets, and low-stock items. Renders in any channel. |
-| `gerador-lista-compras` | Generates the shopping list for your next market trip, based on real consumption and your purchase cadence. |
+| `gerador-lista-compras` | Generates the shopping list for your next market trip, based on real consumption and your purchase cadence — can offer to check a fridge/pantry photo first. |
 | `pesquisa-encartes-mercado` | Registers your 3–5 preferred supermarkets and researches current prices on their sites via Playwright, cross-referencing your shopping list. |
 | `alerta-estoque-baixo` | Checks what's running low and, if you want, schedules a recurring check with a notification. |
 
@@ -36,6 +36,7 @@ section below before using it day to day.
 
 - `despensa.jsonl` — current pantry state, one line per product; the source of truth for stock levels
 - `nota-YYYY-MM-DD-<market>.jsonl` — line-item detail of a single purchase, written once and never rewritten
+- `notas-hash.jsonl` — small append-only index used to catch a receipt you already registered (hash of total + date + market, with an item-comparison fallback when one of those fields wasn't read clearly)
 - `despensa.xlsx` — on-demand export generated from the JSONL data; not the source of truth
 - `mercados.json` — registered preferred markets
 - `config-habitos.json` — purchase frequency and any custom category durations
