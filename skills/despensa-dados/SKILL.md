@@ -222,23 +222,41 @@ def nota_hash(total, data, mercado):
 
 Chamado pela `captura-nota-fiscal` depois que o usuário confirmou.
 
-0. **Confira duplicata antes de aplicar qualquer coisa.** Carregue
-   `notas-hash.jsonl` do canal principal desta sessão (índice minúsculo —
-   não existe ainda? trate como vazio). Calcule o hash da nota atual
-   (`nota_hash`, acima) e procure no índice.
+0. **Confira duplicata antes de aplicar qualquer coisa.**
+
+   **Caminho rápido (padrão): hash.** Só use se os três campos — total,
+   data, mercado — saíram limpos da nota (nenhum `null`/`?`/vazio).
+   Carregue `notas-hash.jsonl` do canal principal desta sessão (índice
+   minúsculo — não existe ainda? trate como vazio). Calcule o hash da
+   nota atual (`nota_hash`, acima) e procure no índice.
 
    - **Não achou o hash** → siga normalmente a partir do passo 1.
    - **Achou o mesmo hash** → pare antes de gravar qualquer coisa e
-     avise o usuário:
+     avise o usuário (mensagem abaixo).
 
-     > Essa nota (mesmo mercado, mesma data, mesmo total) parece já
-     > estar na sua despensa. Quer registrar mesmo assim — por exemplo,
-     > se foi mesmo uma segunda compra igual no mesmo dia — ou prefere
-     > pular pra não duplicar?
+   **Fallback: algum dos três campos não saiu limpo.** O hash não é
+   confiável sem os três — nesse caso raro, compare pelos itens em vez de
+   pular a checagem:
 
-     Só continue para o passo 1 se o usuário confirmar que quer mesmo
-     assim. Se ele preferir pular, pare aqui — nada é gravado, e responda
-     só uma linha confirmando que não registrou de novo.
+   - Procure, no canal principal, arquivos de detalhe da **mesma data**
+     (`nota-<data>-*.jsonl`). Não achou nenhum → siga normalmente, não tem
+     com o que comparar.
+   - Achou um ou mais → carregue os itens (nome + quantidade) e compare
+     com os itens da nota atual. Mais da metade dos itens batendo
+     (mesmo nome normalizado e quantidade) é sinal de duplicata provável.
+   - Sobreposição alta → trate como "achou o hash" (mensagem abaixo).
+     Baixa ou nenhuma sobreposição → siga normalmente a partir do passo 1.
+
+   **Mensagem de duplicata provável (os dois caminhos usam a mesma):**
+
+   > Essa nota (mesmo mercado, mesma data, mesmo total) parece já
+   > estar na sua despensa. Quer registrar mesmo assim — por exemplo,
+   > se foi mesmo uma segunda compra igual no mesmo dia — ou prefere
+   > pular pra não duplicar?
+
+   Só continue para o passo 1 se o usuário confirmar que quer mesmo
+   assim. Se ele preferir pular, pare aqui — nada é gravado, e responda
+   só uma linha confirmando que não registrou de novo.
 
 1. Se os dois canais (pasta local + Drive) existirem nesta sessão, resolva
    a reconciliação da seção 1.2 **primeiro** — o ponto de partida do passo
@@ -253,9 +271,12 @@ Chamado pela `captura-nota-fiscal` depois que o usuário confirmou.
      `p = preço unitário`.
    - Produto novo → acrescente a linha.
 3. Grave o `despensa.jsonl` novo (no canal principal desta sessão — seção
-   1.1), separadamente o arquivo de detalhe daquela nota, e acrescente
-   (nunca reescreva) uma linha nova em `notas-hash.jsonl` com o hash desta
-   nota (passo 0). **Se pelo menos um canal (pasta local ou Drive) gravou
+   1.1) e, separadamente, o arquivo de detalhe daquela nota. Se o hash da
+   nota foi calculável no passo 0 (os três campos saíram limpos),
+   acrescente (nunca reescreva) uma linha nova em `notas-hash.jsonl` com
+   esse hash. Se caiu no fallback (campo faltando), não tem hash pra
+   indexar — tudo bem, o arquivo de detalhe já basta pra fallback futuro
+   comparar. **Se pelo menos um canal (pasta local ou Drive) gravou
    com sucesso, não use `SendUserFile` pra mandar esses arquivos pro
    chat** — isso é só pra quando "nenhum dos dois" existir (seção 1.1).
    Mandar o arquivo pro chat quando já salvou de verdade é ruído técnico
