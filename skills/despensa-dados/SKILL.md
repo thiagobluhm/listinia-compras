@@ -162,6 +162,7 @@ também precisa da atualização — senão a próxima sessão sem acesso à pas
 |---|---|---|
 | `despensa.jsonl` | **Estado atual: uma linha por produto** | Sim, toda vez — por isso tem que ser compacto |
 | `nota-AAAA-MM-DD-<mercado>.jsonl` | Detalhe item a item de uma compra | **Não. Escrito uma vez e nunca mais tocado** |
+| `notas-hash.jsonl` | Índice de notas já registradas, pra detectar duplicata | **Não. Só acrescenta uma linha por nota nova** |
 | `mercados.json` | Mercados preferidos | Raro |
 | `config-habitos.json` | Frequência de compra e ajustes | Raro |
 | `Listinia - Dashboard.md` | Dashboard | Só quando pedido |
@@ -193,11 +194,51 @@ Campo ilegível na nota vai como `null` — nunca chute um valor.
 Esses arquivos são o histórico completo: se algum dia o estado atual ficar
 estranho, dá pra reconstruir tudo a partir deles.
 
+### `notas-hash.jsonl` — índice pra não registrar a mesma nota duas vezes
+
+Uma linha por nota já registrada, só com o essencial pra identificar a
+compra sem comparar item por item:
+
+```json
+{"h":"a1b2c3d4e5f60718","data":"2026-08-15","mercado":"Mercadinho X","total":11.0}
+```
+
+O hash (`h`) vem de três campos que a nota já entrega prontos — **total,
+data, mercado** — nunca dos itens (comparar item a item é lento e essa é
+justamente a conta que esse índice evita). Gere por código, nunca de
+cabeça:
+
+```python
+import hashlib
+
+def nota_hash(total, data, mercado):
+    chave = f"{round(float(total), 2):.2f}|{data}|{mercado.strip().lower()}"
+    return hashlib.sha256(chave.encode("utf-8")).hexdigest()[:16]
+```
+
 ---
 
 ## 3. Registrar uma compra (o caminho quente)
 
 Chamado pela `captura-nota-fiscal` depois que o usuário confirmou.
+
+0. **Confira duplicata antes de aplicar qualquer coisa.** Carregue
+   `notas-hash.jsonl` do canal principal desta sessão (índice minúsculo —
+   não existe ainda? trate como vazio). Calcule o hash da nota atual
+   (`nota_hash`, acima) e procure no índice.
+
+   - **Não achou o hash** → siga normalmente a partir do passo 1.
+   - **Achou o mesmo hash** → pare antes de gravar qualquer coisa e
+     avise o usuário:
+
+     > Essa nota (mesmo mercado, mesma data, mesmo total) parece já
+     > estar na sua despensa. Quer registrar mesmo assim — por exemplo,
+     > se foi mesmo uma segunda compra igual no mesmo dia — ou prefere
+     > pular pra não duplicar?
+
+     Só continue para o passo 1 se o usuário confirmar que quer mesmo
+     assim. Se ele preferir pular, pare aqui — nada é gravado, e responda
+     só uma linha confirmando que não registrou de novo.
 
 1. Se os dois canais (pasta local + Drive) existirem nesta sessão, resolva
    a reconciliação da seção 1.2 **primeiro** — o ponto de partida do passo
@@ -212,11 +253,13 @@ Chamado pela `captura-nota-fiscal` depois que o usuário confirmou.
      `p = preço unitário`.
    - Produto novo → acrescente a linha.
 3. Grave o `despensa.jsonl` novo (no canal principal desta sessão — seção
-   1.1) e, separadamente, o arquivo de detalhe daquela nota. **Se pelo
-   menos um canal (pasta local ou Drive) gravou com sucesso, não use
-   `SendUserFile` pra mandar esses arquivos pro chat** — isso é só pra
-   quando "nenhum dos dois" existir (seção 1.1). Mandar o arquivo pro chat
-   quando já salvou de verdade é ruído técnico que o usuário não pediu.
+   1.1), separadamente o arquivo de detalhe daquela nota, e acrescente
+   (nunca reescreva) uma linha nova em `notas-hash.jsonl` com o hash desta
+   nota (passo 0). **Se pelo menos um canal (pasta local ou Drive) gravou
+   com sucesso, não use `SendUserFile` pra mandar esses arquivos pro
+   chat** — isso é só pra quando "nenhum dos dois" existir (seção 1.1).
+   Mandar o arquivo pro chat quando já salvou de verdade é ruído técnico
+   que o usuário não pediu.
 4. Responda em duas linhas: quantos itens entraram, o total da nota, onde
    salvou. Se algum campo ficou ilegível, cite em uma linha depois.
 5. Só então, se os dois canais existirem, dispare o espelhamento da seção
