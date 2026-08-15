@@ -58,39 +58,101 @@ verificação intermediária. Monte o conteúdo e grave. Só isso.
 
 ---
 
-## 1. Onde salvar (nesta ordem)
+## 1. Onde salvar
 
-### Opção A — Pasta do usuário (a mais rápida, quando existir)
+Duas pernas podem existir ao mesmo tempo — **pasta local** (rápida, só
+acessível na sessão que tem a pasta conectada) e **Google Drive**
+(universal, qualquer canal — celular, web, desktop). Elas não se
+comunicam sozinhas: se hoje você registra pela pasta local e amanhã pelo
+celular, cada canal só vê o que foi escrito nele, a não ser que a gente
+force a sincronia. É por isso que existe a seção 1.2 abaixo — **não pule
+ela** quando os dois canais existirem.
 
-Se esta sessão tiver acesso a uma pasta do usuário — um projeto do Cowork,
-uma pasta conectada, ou o Cowork rodando no computador dele — **use ela**.
-É a melhor opção porque permite **acrescentar linha no fim do arquivo**
-sem reescrever nada:
+### 1.0 Detecte o que esta sessão tem
 
-```python
-with open(caminho, "a", encoding="utf-8") as f:
-    f.write(linha_nova + "\n")
-```
+- **Pasta local?** Um projeto do Cowork, uma pasta conectada, ou o Cowork
+  rodando no computador do usuário. Guarde tudo em `Listinia Compras/`
+  dentro dela.
+- **Google Drive conectado?** Ferramentas do Drive disponíveis (carregue
+  pelo nome exato — seção 5.0 — antes de concluir que não tem).
 
-Nesse modo o histórico completo pode crescer à vontade, porque acrescentar
-custa o mesmo sempre. Guarde tudo em `Listinia Compras/` dentro da pasta.
+Pode ter os dois, só um, ou nenhum. O restante desta seção assume que você
+já sabe quais dos dois existem aqui.
 
-### Opção B — Google Drive (padrão no celular)
+### 1.1 Só Drive, ou só pasta local → sem reconciliação, siga direto
 
-Sem pasta local, use o Google Drive — funciona igual em celular, web e
-desktop. Aqui **não dá pra acrescentar**, só substituir o arquivo inteiro;
-por isso o formato compacto da seção 2 é obrigatório.
+- **Só Drive:** use o Drive normalmente (seção 5). Ele é o canal universal
+  — qualquer sessão futura, em qualquer aparelho, vai enxergar o que você
+  gravar aqui. Não dá pra acrescentar, só substituir o arquivo inteiro;
+  por isso o formato compacto da seção 2 é obrigatório.
+- **Só pasta local:** use ela (mais rápida — dá pra **acrescentar linha no
+  fim do arquivo** sem reescrever nada):
 
-### Opção C — Sem nenhum dos dois
+  ```python
+  with open(caminho, "a", encoding="utf-8") as f:
+      f.write(linha_nova + "\n")
+  ```
 
-Trabalhe normalmente e, no fim, entregue o arquivo da despensa com
-`SendUserFile`, explicando em duas linhas:
+  Se o usuário perguntar se isso vai aparecer no celular depois, seja
+  direto: sem Drive conectado, não — essa pasta só existe aqui.
+- **Nenhum dos dois:** trabalhe normalmente e, no fim, entregue o arquivo
+  da despensa com `SendUserFile`, explicando em duas linhas:
 
-> Não consegui salvar no seu Google Drive nesta conversa, então te mandei
-> a sua despensa aqui em cima — guarde esse arquivo e anexe na próxima vez
-> que a gente conversar, que eu continuo de onde paramos.
+  > Não consegui salvar no seu Google Drive nesta conversa, então te mandei
+  > a sua despensa aqui em cima — guarde esse arquivo e anexe na próxima vez
+  > que a gente conversar, que eu continuo de onde paramos.
 
-Não pergunte nada, não ofereça opções: decida e siga.
+  Não pergunte nada, não ofereça opções: decida e siga.
+
+### 1.2 Pasta local **e** Drive na mesma sessão → reconcilie antes de gravar
+
+Isso é o que faz os dois canais "conversarem" entre si sem custar o ciclo
+lento do Drive toda vez. Faça isso **antes** de aplicar qualquer registro
+novo, uma única vez no início da operação:
+
+1. Pegue a data de modificação do `despensa.jsonl` dos dois lados — o
+   mtime do arquivo na pasta local, e o `modifiedTime` do arquivo no Drive
+   (metadado só, **não baixe o conteúdo ainda** — isso é rápido).
+2. Um dos dois não existe ainda → copie o que existe pro que falta e siga
+   com esse conteúdo como ponto de partida.
+3. Datas iguais (ou a diferença é só o próprio espelhamento de rotina) →
+   a pasta local já está sincronizada; use ela como ponto de partida
+   (é a mais barata de ler).
+4. **Drive mais recente que a pasta local** → alguma sessão sem acesso à
+   pasta (celular, por exemplo) gravou depois da última vez que essa
+   pasta foi atualizada. Baixe o conteúdo do Drive, use-o como ponto de
+   partida **e** grave essa mesma versão na pasta local antes de aplicar
+   a nota nova — assim a pasta se atualiza e nada do que foi comprado pelo
+   celular se perde.
+5. **Pasta local mais recente que o Drive** → uma gravação anterior não
+   conseguiu terminar o espelhamento (seção 1.3). Use a pasta local como
+   ponto de partida e, ao gravar, garanta que o espelhamento rode de novo.
+
+Depois de resolvido, siga o registro normalmente (seção 3) usando o
+conteúdo escolhido como base.
+
+### 1.3 Depois de gravar na pasta local, espelhe pro Drive em paralelo
+
+Sempre que os dois canais existirem e você gravar na pasta local, o Drive
+também precisa da atualização — senão a próxima sessão sem acesso à pasta
+(celular) fica com dado velho.
+
+**Não faça isso antes de responder ao usuário.** A ordem é:
+
+1. Grave na pasta local (rápido) e responda ao usuário como sempre
+   (seção 3, passo 4) — ele não deveria esperar o Drive pra ouvir "salvo".
+2. Só depois disso, dispare o espelhamento como uma tarefa separada (um
+   subagente, em paralelo) que aplica a receita da seção 5.3 no Drive com
+   o conteúdo final que você acabou de gravar localmente. Não espere o
+   resultado bloquear mais nada da conversa — é manutenção de
+   consistência, não faz parte do que o usuário pediu.
+3. Se o espelhamento falhar, **não avise o usuário nem tente de novo na
+   hora** — a próxima sessão com os dois canais disponíveis vai detectar
+   a divergência na seção 1.2 e resolver sozinha. Isso só vira um aviso
+   pro usuário se falhar repetidamente por vários dias (aí sim, uma linha
+   simples: "não consegui atualizar sua despensa no Drive nas últimas
+   vezes — se estiver usando o celular, os dados podem estar
+   desatualizados").
 
 ---
 
@@ -137,8 +199,11 @@ estranho, dá pra reconstruir tudo a partir deles.
 
 Chamado pela `captura-nota-fiscal` depois que o usuário confirmou.
 
-1. Carregue o `despensa.jsonl` atual (é pequeno). Não existe ainda? Comece
-   vazio, sem cerimônia.
+1. Se os dois canais (pasta local + Drive) existirem nesta sessão, resolva
+   a reconciliação da seção 1.2 **primeiro** — o ponto de partida do passo
+   2 é o resultado dela, não uma leitura direta e cega de um dos lados.
+   Só um canal? Carregue o `despensa.jsonl` dele normalmente (é pequeno).
+   Não existe ainda? Comece vazio, sem cerimônia.
 2. **Em um único script Python**, aplique a nota sobre o estado:
    - Para cada item: normalize o nome (Title Case) e classifique a
      categoria pela tabela da seção 4.
@@ -146,10 +211,12 @@ Chamado pela `captura-nota-fiscal` depois que o usuário confirmou.
      `q = q + qtd_comprada`, `cm = qtd_comprada`, `uc = data da nota`,
      `p = preço unitário`.
    - Produto novo → acrescente a linha.
-3. Grave o `despensa.jsonl` novo e, separadamente, o arquivo de detalhe
-   daquela nota.
+3. Grave o `despensa.jsonl` novo (no canal principal desta sessão — seção
+   1.1) e, separadamente, o arquivo de detalhe daquela nota.
 4. Responda em duas linhas: quantos itens entraram, o total da nota, onde
    salvou. Se algum campo ficou ilegível, cite em uma linha depois.
+5. Só então, se os dois canais existirem, dispare o espelhamento da seção
+   1.3 — depois de já ter respondido, nunca antes.
 
 **Quando chamada pela `captura-nota-fiscal`, a confirmação já aconteceu
 antes de chegar aqui** — aquela skill pergunta obrigatoriamente se o

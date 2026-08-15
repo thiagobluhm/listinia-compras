@@ -55,10 +55,19 @@ directly. This is the best option because purchase history can grow
 without ever slowing down, since new records are appended rather than
 rewritten.
 
-**Google Drive (default on mobile):** without a local folder, the plugin
-uses Google Drive — works the same on mobile, web, or desktop. Once you've
-connected Drive (in Claude's connector settings), there's nothing manual
-to do afterward.
+**Google Drive (the universal channel):** without a local folder, the
+plugin uses Google Drive — works the same on mobile, web, or desktop.
+Once you've connected Drive (in Claude's connector settings), there's
+nothing manual to do afterward.
+
+**Both connected? They stay in sync automatically.** A local folder is
+only visible to the session that has it connected — your phone can't see
+it. So whenever both channels are available in the same session, the
+plugin checks which one has the newer data before writing, adopts that as
+the starting point, and mirrors every local update to Drive right after
+responding to you (never before — you don't wait on the mirror). That
+keeps your phone and your desktop looking at the same pantry, without
+needing the slow Drive round-trip on every single write.
 
 **Neither available:** the plugin still works, but persistence becomes
 manual — at the end of the conversation you receive the updated file to
