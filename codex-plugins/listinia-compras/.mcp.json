@@ -1,0 +1,13 @@
+{
+  "mcpServers": {
+    "listinIA": {
+      "type": "http",
+      "url": "https://listinia-despensa.thiagobluhm.workers.dev/mcp"
+    },
+    "playwright": {
+      "command": "npx",
+      "args": ["-y", "@playwright/mcp@latest"]
+    }
+  }
+}
+

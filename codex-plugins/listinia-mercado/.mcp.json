@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "listinIA": {
+      "type": "http",
+      "url": "https://listinia-despensa.thiagobluhm.workers.dev/mcp"
+    }
+  }
+}

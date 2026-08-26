@@ -1,0 +1,20 @@
+{
+  "name": "listinia-mercado",
+  "version": "1.2.0",
+  "description": "Publica e gerencia encartes, cadastro e desempenho de estabelecimentos no Listinia.",
+  "author": { "name": "Thiago Bluhm — AIstein LTDA" },
+  "license": "MIT",
+  "keywords": ["encarte", "ofertas", "supermercado", "farmacia", "varejo", "retail-media"],
+  "skills": "./skills/",
+  "mcpServers": "./.mcp.json",
+  "interface": {
+    "displayName": "Listinia Mercado",
+    "shortDescription": "Encarte e desempenho do seu estabelecimento",
+    "longDescription": "Cadastre o estabelecimento, publique encartes por planilha, confira ofertas vigentes e acompanhe resultados atribuídos.",
+    "developerName": "AIstein LTDA",
+    "category": "Productivity",
+    "capabilities": ["Interactive", "Write"],
+    "defaultPrompt": ["Publique este encarte no Listinia.", "O que está no ar agora?", "Como meu encarte está performando?"],
+    "brandColor": "#E38B2C"
+  }
+}

@@ -1,0 +1,21 @@
+{
+  "name": "listinia-compras",
+  "version": "1.2.0",
+  "description": "Gerencia despensa, notas fiscais, gastos, listas de compras e ofertas de mercado com dados do servidor Listinia.",
+  "author": { "name": "Thiago Bluhm — AIstein LTDA" },
+  "license": "MIT",
+  "keywords": ["despensa", "lista-de-compras", "nota-fiscal", "nfc-e", "supermercado"],
+  "skills": "./skills/",
+  "mcpServers": "./.mcp.json",
+  "interface": {
+    "displayName": "Listinia Compras",
+    "shortDescription": "Sua despensa e lista de compras no Codex",
+    "longDescription": "Capture notas fiscais, acompanhe estoque e gastos, gere listas de compras pelo consumo real e compare ofertas publicadas no Listinia.",
+    "developerName": "AIstein LTDA",
+    "category": "Productivity",
+    "capabilities": ["Interactive", "Write"],
+    "defaultPrompt": ["O que está acabando na minha despensa?", "Monte minha lista de compras.", "Capture esta nota fiscal e organize os itens."],
+    "brandColor": "#36A269"
+  }
+}
+

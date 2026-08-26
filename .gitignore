@@ -1,6 +1,14 @@
 /_pode_apagar
+/_draft
+/_trash
 /assets
 _pode_apagar
 assets
 .env
 .env.local
+*.zip
+*.rar
+
+# credenciais OAuth baixadas do Google Cloud Console
+client_secret_*.json
+.dev.vars

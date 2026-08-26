@@ -1,95 +1,63 @@
 ---
 name: pesquisa-encartes-mercado
-description: Registers the user's preferred supermarkets (name, address, website, flyer/offers page) on first use, and researches current promotions on those sites via Playwright to estimate prices for a shopping list. Use when the user wants to add or update a preferred market, check current supermarket offers/encartes, or wants their shopping list with an estimated price and the cheapest option per item.
+description: Registers the user's preferred supermarkets (name, address, website, flyer/offers page) and researches current promotions on those sites via the browser to estimate prices for a shopping list. Use when the user wants to add or update a preferred market, check current supermarket offers/encartes, or wants their shopping list with an estimated price and the cheapest option per item.
 ---
 
 # Pesquisa de Encartes de Supermercado
 
-## 🗣️ Como falar (regra que vale para tudo abaixo)
+Delegue ao agente **`listinia-navegador`** (ferramenta `Agent`) — é o único
+com o navegador. Ele varre os sites e devolve as ofertas cruas; o
+cruzamento com a lista e a conta ficam com você (ou com o orquestrador).
 
-Quem usa este plugin é uma pessoa comum organizando as compras de casa —
-não um programador. A conversa tem que parecer um assistente prestativo,
-nunca um terminal.
+**Isto é funcionalidade nova** — não existe no app Listinia real, onde o
+encarte é o próprio supermercado que sobe. Aqui a pessoa pesquisa direto
+nos sites dos mercados que escolher.
 
-**Nunca escreva na resposta:** nome de ferramenta, ID de arquivo, trecho de
-código, JSON, "JSONL", "base64", "camada", nome técnico de arquivo, ou
-explicação de como você funciona por dentro.
+## Mercados preferidos
 
-**Fale assim:** "sua despensa", "sua lista de compras", "salvei no seu
-Google Drive", "não consegui salvar agora".
+O servidor listinIA ainda não guarda mercados preferidos. Então:
 
-**Se der problema:** resolva sozinho. Se realmente não der, diga em UMA
-frase simples o que houve e o que você já vai fazer a respeito — nunca
-peça um código ou ID ao usuário, nunca ofereça opções técnicas, nunca
-liste as ferramentas que você tem. Ele não tem como responder isso e só
-vai se sentir perdido.
+- Se houver uma pasta conectada nesta sessão, salve `mercados.json` lá e
+  releia dela nas próximas vezes.
+- Sem pasta, pergunte na hora — e não repita a pergunta dentro da mesma
+  conversa.
 
-**Seja curto.** Duas ou três linhas por resposta bastam, sem relatório do
-que você fez por dentro.
+Peça de 3 a 5 mercados: nome, endereço, site e, se a pessoa souber, a
+página de encartes/ofertas. Não souber a página → o `listinia-navegador`
+localiza (procurando "Ofertas", "Encartes", "Promoções") e devolve o
+endereço.
 
-**Isto é funcionalidade nova** — não existe hoje no app Listinia real (lá,
-o encarte é o próprio supermercado que sobe via upload). Aqui o objetivo é
-o usuário final pesquisar preços diretamente nos sites dos mercados que ele
-escolher, via navegador automatizado.
+Já existindo a lista, "adiciona esse mercado" ou "troca o X pelo Y" edita
+só o que mudou — não peça os outros de novo.
 
-## Cadastro de mercados (primeira vez ou quando pedido)
+## Cruzamento com a lista
 
-Arquivo: `mercados.json`, guardado no mesmo lugar dos outros dados do
-plugin — use a skill `despensa-dados` (seção "Receita do Google Drive")
-para ler e gravar, mudando só o `title`. Carregue o real antes de assumir
-que não existe nenhum mercado cadastrado.
+1. Para cada item da lista, procure correspondência nas ofertas que
+   voltaram, por nome e categoria.
+2. Havendo preço em mais de um mercado, aponte o mais barato.
+3. Sem preço em nenhum → **"sem cotação"**. Nunca estime.
+4. Some por código o total estimado, deixando explícito que os itens sem
+   cotação ficaram de fora da soma.
 
-```json
-{
-  "mercados": [
-    {"nome": "", "endereco": "", "site": "", "pagina_encartes": ""}
-  ]
-}
-```
+Entregue: item, quantidade, mercado mais barato (ou "sem cotação"), preço
+unitário, e o total estimado.
 
-- Se o arquivo não existir e o usuário pedir uma pesquisa de preços,
-  pergunte por 3 a 5 mercados preferidos: nome, endereço, site e — se ele
-  souber — a página específica de encartes/ofertas. Se ele não souber a
-  página de encartes, tente localizá-la você mesmo (navegue até o site e
-  procure links como "Ofertas", "Encartes", "Promoções").
-- Se o arquivo já existir e o usuário disser algo como "adiciona esse
-  mercado" ou "troca o mercado X pelo Y", edite a lista existente — não
-  peça os outros mercados de novo, só o que mudou.
+## 🚫 JAMAIS INVENTAR
 
-## Pesquisa de ofertas
+- Preço que não estava escrito na página não existe.
+- Mercado cujo site bloqueou ou não carregou é dito como tal — não ganha
+  preço médio dos outros, nem "por volta de".
+- Correspondência aproximada de nome é sugestão: mostre o nome do produto
+  como veio da página, para a pessoa julgar se é o mesmo item.
+- Não invente o endereço de uma página de ofertas.
 
-1. Para cada mercado cadastrado, use as ferramentas MCP do Playwright para
-   navegar até a `pagina_encartes` (ou o site, se não houver página
-   específica).
-2. Extraia produtos e preços visíveis na página (nome, preço, unidade
-   quando disponível).
-3. Alguns sites bloqueiam scraping ou usam paginação/carrossel — se não
-   conseguir extrair nada de um mercado, registre isso explicitamente em
-   vez de inventar preços para ele.
+## 🗣️ Como falar
 
-## Cruzamento com a lista de compras
-
-Para cada item da lista (vinda da skill `gerador-lista-compras` ou
-informada diretamente pelo usuário):
-
-1. Procure correspondência (por nome/categoria, aproximada) nas ofertas
-   extraídas de cada mercado.
-2. Se houver preço em mais de um mercado, aponte o mais barato.
-3. Se não houver preço em nenhum mercado, marque o item como **"sem
-   cotação"** — nunca estime um preço que não veio de uma fonte real.
-4. Calcule o valor total estimado: some os preços encontrados; para itens
-   sem cotação, deixe claro que não entraram na soma.
-
-## Resultado final
-
-Entregue a lista com: item, quantidade, mercado mais barato encontrado
-(ou "sem cotação"), preço unitário, e o valor total estimado da compra —
-isto é a "lista pronta com o provável valor" que o usuário pediu.
+Sem nome de ferramenta, de agente ou de arquivo. Se um mercado não deu
+retorno, uma frase basta: "o site do X não deixou eu ver as ofertas hoje".
 
 ## Roadmap (não implementar agora)
 
-O usuário mencionou que, no futuro, isso vai evoluir para um MCP dedicado
-que conecta diretamente com os supermercados parceiros da plataforma
-Listinia (via o marketplace de ofertas já existente no backend). Esta
-skill é a versão manual/exploratória enquanto isso não existe — não tente
-construir esse MCP aqui.
+No futuro isso vira um MCP dedicado ligado ao marketplace de ofertas do
+backend Listinia, onde os supermercados cadastrados disputam a demanda.
+Esta skill é a versão exploratória enquanto isso não existe.
