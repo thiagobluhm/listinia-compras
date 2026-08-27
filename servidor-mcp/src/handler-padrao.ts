@@ -71,17 +71,23 @@ async function publicarPorHttp(request: Request, env: EnvPublico): Promise<Respo
 	return json({ ...r, estabelecimento: loja.nome }, r.ok ? 200 : 422);
 }
 
-export const HandlerPadrao = {
-	async fetch(request: Request, env: EnvPublico, ctx: ExecutionContext): Promise<Response> {
-		const { pathname } = new URL(request.url);
+/**
+ * O Worker de Compras nao abre a porta do ERP: rotaErp: false faz /v1/encarte
+ * simplesmente nao existir la, em vez de existir e recusar.
+ */
+export function criarHandlerPadrao(opcoes: { rotaErp: boolean }) {
+	return {
+		async fetch(request: Request, env: EnvPublico, ctx: ExecutionContext): Promise<Response> {
+			const { pathname } = new URL(request.url);
 
-		if (pathname === "/v1/encarte") {
-			if (request.method !== "POST") {
-				return json({ erro: "use POST" }, 405, { Allow: "POST" });
+			if (opcoes.rotaErp && pathname === "/v1/encarte") {
+				if (request.method !== "POST") {
+					return json({ erro: "use POST" }, 405, { Allow: "POST" });
+				}
+				return publicarPorHttp(request, env);
 			}
-			return publicarPorHttp(request, env);
-		}
 
-		return GoogleHandler.fetch(request, env as never, ctx);
-	},
-};
+			return GoogleHandler.fetch(request, env as never, ctx);
+		},
+	};
+}

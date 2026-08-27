@@ -1,0 +1,41 @@
+/**
+ * Listinia — Worker de MERCADO (plugin listinia-mercado)
+ * Cadastro do estabelecimento, encarte e desempenho. 8 ferramentas.
+ * Expoe tambem POST /v1/encarte, a porta do ERP do lojista.
+ *
+ * Deploy: npm run deploy:mercado
+ * Divide D1 e OAUTH_KV com o Worker de Compras — mesmo banco, mesma sessao.
+ */
+{
+	"$schema": "node_modules/wrangler/config-schema.json",
+	"name": "listinia-mercado",
+	"main": "src/mercado.ts",
+	"compatibility_date": "2026-07-02",
+	"compatibility_flags": ["nodejs_compat"],
+	"observability": { "enabled": true },
+
+	// Assim que a zona listinia.com.br estiver na Cloudflare, descomente o
+	// bloco abaixo, troque MCP_RESOURCE pela URL do dominio proprio e refaca o
+	// deploy. Enquanto isso o host de mercado e o workers.dev.
+	// "routes": [
+	// 	{ "pattern": "mercado-mcp.listinia.com.br", "custom_domain": true }
+	// ],
+
+	"vars": {
+		// Conta Google que recebe a despensa legada no primeiro login.
+		"EMAIL_DONO_LEGADO": "thiagobluhm@gmail.com",
+		// Precisa bater EXATAMENTE com a URL digitada na Claude, /mcp incluido.
+		"MCP_RESOURCE": "https://listinia-mercado.thiagobluhm.workers.dev/mcp"
+		// dominio proprio: "https://mercado-mcp.listinia.com.br/mcp"
+	},
+	"kv_namespaces": [
+		{ "binding": "OAUTH_KV", "id": "ad6da5681bd64333b4af51b0f1758ad1" }
+	],
+	"d1_databases": [
+		{
+			"binding": "DB",
+			"database_name": "listinia",
+			"database_id": "352349d4-ff27-4322-b605-14a9a32ed842"
+		}
+	]
+}

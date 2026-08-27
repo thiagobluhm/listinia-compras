@@ -1,5 +1,5 @@
 /**
- * As ferramentas de encarte e oferta.
+ * As ferramentas de encarte (Worker de Mercado) e de oferta (Worker de Compras).
  *
  * As de encarte são do lojista: identificado pela conta que ele usou para
  * entrar, cruzada com estabelecimentos.dono_user_id. As de oferta são do
@@ -48,11 +48,19 @@ const itemEncarteSchema = z.object({
 	observacao: z.string().nullable().optional().describe("'leve 3 pague 2', 'só na loja Centro'"),
 });
 
-export function registrarToolsEncartes(server: McpServer, db: D1Database, userId: string) {
+/** Lado lojista — so o Worker de Mercado registra. */
+export function registrarToolsMercado(server: McpServer, db: D1Database, userId: string) {
 	// ------------------------------------------------------------- LOJISTA
 	server.registerTool(
 		"estabelecimento_registrar",
 		{
+			title: "Cadastrar o estabelecimento",
+			annotations: {
+				readOnlyHint: false,
+				destructiveHint: false,
+				idempotentHint: false,
+				openWorldHint: false,
+			},
 			description:
 				"Registra o estabelecimento (mercado, farmácia ou outro ramo) desta conta e devolve a chave de API usada por integração automática. A chave é mostrada UMA vez.",
 			inputSchema: z.object({
@@ -115,6 +123,13 @@ export function registrarToolsEncartes(server: McpServer, db: D1Database, userId
 	server.registerTool(
 		"estabelecimento_nova_chave",
 		{
+			title: "Gerar nova chave de integracao",
+			annotations: {
+				readOnlyHint: false,
+				destructiveHint: true,
+				idempotentHint: false,
+				openWorldHint: false,
+			},
 			description:
 				"Gera uma chave de API nova para o estabelecimento desta conta e invalida a anterior. Use quando a chave vazou ou foi perdida.",
 			inputSchema: z.object({}),
@@ -138,6 +153,13 @@ export function registrarToolsEncartes(server: McpServer, db: D1Database, userId
 	server.registerTool(
 		"encarte_publicar",
 		{
+			title: "Publicar o encarte",
+			annotations: {
+				readOnlyHint: false,
+				destructiveHint: true,
+				idempotentHint: false,
+				openWorldHint: false,
+			},
 			description:
 				"Publica o encarte do estabelecimento desta conta. Por padrão substitui o encarte vigente — o anterior sai do ar só depois que o novo entrou inteiro. Devolve o que foi gravado e o que foi rejeitado, linha a linha.",
 			inputSchema: z.object({
@@ -166,6 +188,13 @@ export function registrarToolsEncartes(server: McpServer, db: D1Database, userId
 	server.registerTool(
 		"encarte_remover",
 		{
+			title: "Apagar um encarte",
+			annotations: {
+				readOnlyHint: false,
+				destructiveHint: true,
+				idempotentHint: true,
+				openWorldHint: false,
+			},
 			description:
 				"Apaga um encarte e seus itens de vez. Para só tirar do ar, publique outro — a substituição preserva o histórico de preço.",
 			inputSchema: z.object({ encarte_id: z.number().int() }),
@@ -180,6 +209,13 @@ export function registrarToolsEncartes(server: McpServer, db: D1Database, userId
 	server.registerTool(
 		"encarte_listar",
 		{
+			title: "Encartes do estabelecimento",
+			annotations: {
+				readOnlyHint: true,
+				destructiveHint: false,
+				idempotentHint: true,
+				openWorldHint: false,
+			},
 			description: "Encartes já publicados por este estabelecimento, do mais recente ao mais antigo.",
 			inputSchema: z.object({ limite: z.number().int().min(1).max(100).default(20) }),
 		},
@@ -193,6 +229,13 @@ export function registrarToolsEncartes(server: McpServer, db: D1Database, userId
 	server.registerTool(
 		"encarte_itens",
 		{
+			title: "Itens de um encarte",
+			annotations: {
+				readOnlyHint: true,
+				destructiveHint: false,
+				idempotentHint: true,
+				openWorldHint: false,
+			},
 			description: "Itens de um encarte específico, para conferência.",
 			inputSchema: z.object({ encarte_id: z.number().int() }),
 		},
@@ -202,43 +245,17 @@ export function registrarToolsEncartes(server: McpServer, db: D1Database, userId
 			return texto(await itensDoEncarte(db, loja.id, encarte_id));
 		},
 	);
-
-	// ---------------------------------------------------------- CONSUMIDOR
-	server.registerTool(
-		"ofertas_buscar",
-		{
-			description:
-				"Procura um produto nos encartes vigentes de todos os estabelecimentos, do mais barato para o mais caro. Substitui a varredura de sites.",
-			inputSchema: z.object({
-				termo: z.string().min(1).describe("Trecho do nome do produto"),
-				tipo: z.string().optional().describe("Filtra por ramo: 'mercado', 'farmacia'..."),
-				cidade: z.string().optional(),
-				limite: z.number().int().min(1).max(100).default(30),
-			}),
-		},
-		async ({ termo, tipo, cidade, limite }) =>
-			texto(await buscarOfertas(db, termo, { tipo, cidade, limite, userId })),
-	);
-
-	server.registerTool(
-		"ofertas_por_lista",
-		{
-			description:
-				"Cruza uma lista de compras inteira com os encartes vigentes e devolve o mais barato por item, mais o total estimado. Item sem oferta volta como 'sem cotação' — nunca com preço estimado.",
-			inputSchema: z.object({
-				itens: z.array(z.string()).min(1).describe("Nomes dos produtos da lista"),
-				tipo: z.string().optional(),
-				cidade: z.string().optional(),
-			}),
-		},
-		async ({ itens, tipo, cidade }) =>
-			texto(await ofertasParaLista(db, itens, { tipo, cidade, userId })),
-	);
-
 	// ------------------------------------------------------- DESEMPENHO
 	server.registerTool(
 		"desempenho_encarte",
 		{
+			title: "Desempenho de um encarte publicado",
+			annotations: {
+				readOnlyHint: true,
+				destructiveHint: false,
+				idempotentHint: true,
+				openWorldHint: false,
+			},
 			description:
 				"Relatório de desempenho de um encarte: alcance qualificado, captura da lista, compras confirmadas por nota fiscal e aderência de preço. Números de coorte, nunca de pessoa. Só o dono do estabelecimento consulta.",
 			inputSchema: z.object({
@@ -262,6 +279,13 @@ export function registrarToolsEncartes(server: McpServer, db: D1Database, userId
 	server.registerTool(
 		"estabelecimento_apelido_adicionar",
 		{
+			title: "Adicionar apelido do estabelecimento",
+			annotations: {
+				readOnlyHint: false,
+				destructiveHint: false,
+				idempotentHint: true,
+				openWorldHint: false,
+			},
 			description:
 				"Cadastra como o nome da loja sai impresso no cupom fiscal, para que as compras dos clientes passem a ser atribuídas a ela. Sem isso, a nota traz um nome que não casa com o cadastro e a compra não é contabilizada.",
 			inputSchema: z.object({
@@ -291,5 +315,54 @@ export function registrarToolsEncartes(server: McpServer, db: D1Database, userId
 				.run();
 			return texto({ ok: true, apelido: nome_no_cupom, estabelecimento: loja.nome });
 		},
+	);
+}
+
+/** Lado consumidor — so o Worker de Compras registra. */
+export function registrarToolsOfertas(server: McpServer, db: D1Database, userId: string) {
+	// ---------------------------------------------------------- CONSUMIDOR
+	server.registerTool(
+		"ofertas_buscar",
+		{
+			title: "Ofertas publicadas por um produto",
+			annotations: {
+				readOnlyHint: true,
+				destructiveHint: false,
+				idempotentHint: true,
+				openWorldHint: false,
+			},
+			description:
+				"Procura um produto nos encartes vigentes de todos os estabelecimentos, do mais barato para o mais caro. Substitui a varredura de sites.",
+			inputSchema: z.object({
+				termo: z.string().min(1).describe("Trecho do nome do produto"),
+				tipo: z.string().optional().describe("Filtra por ramo: 'mercado', 'farmacia'..."),
+				cidade: z.string().optional(),
+				limite: z.number().int().min(1).max(100).default(30),
+			}),
+		},
+		async ({ termo, tipo, cidade, limite }) =>
+			texto(await buscarOfertas(db, termo, { tipo, cidade, limite, userId })),
+	);
+
+	server.registerTool(
+		"ofertas_por_lista",
+		{
+			title: "Ofertas para uma lista de compras",
+			annotations: {
+				readOnlyHint: true,
+				destructiveHint: false,
+				idempotentHint: true,
+				openWorldHint: false,
+			},
+			description:
+				"Cruza uma lista de compras inteira com os encartes vigentes e devolve o mais barato por item, mais o total estimado. Item sem oferta volta como 'sem cotação' — nunca com preço estimado.",
+			inputSchema: z.object({
+				itens: z.array(z.string()).min(1).describe("Nomes dos produtos da lista"),
+				tipo: z.string().optional(),
+				cidade: z.string().optional(),
+			}),
+		},
+		async ({ itens, tipo, cidade }) =>
+			texto(await ofertasParaLista(db, itens, { tipo, cidade, userId })),
 	);
 }

@@ -74,6 +74,13 @@ function createServer(env: ListiniaEnv, userId: string) {
 	server.registerTool(
 		"despensa_listar",
 		{
+			title: "Estado atual da despensa",
+			annotations: {
+				readOnlyHint: true,
+				destructiveHint: false,
+				idempotentHint: true,
+				openWorldHint: false,
+			},
 			description:
 				"Lista o estado atual da despensa (um registro por produto). Use para saber o que tem em casa.",
 			inputSchema: z.object({
@@ -113,6 +120,13 @@ function createServer(env: ListiniaEnv, userId: string) {
 	server.registerTool(
 		"despensa_status",
 		{
+			title: "Dias de estoque e status por produto",
+			annotations: {
+				readOnlyHint: true,
+				destructiveHint: false,
+				idempotentHint: true,
+				openWorldHint: false,
+			},
 			description:
 				"Calcula dias restantes de estoque e status (crítico / baixo / ok) de cada produto. Base para a lista de compras.",
 			inputSchema: z.object({
@@ -159,6 +173,13 @@ function createServer(env: ListiniaEnv, userId: string) {
 	server.registerTool(
 		"notas_listar",
 		{
+			title: "Notas fiscais registradas",
+			annotations: {
+				readOnlyHint: true,
+				destructiveHint: false,
+				idempotentHint: true,
+				openWorldHint: false,
+			},
 			description: "Histórico de compras registradas, da mais recente para a mais antiga.",
 			inputSchema: z.object({ limite: z.number().int().min(1).max(200).default(20) }),
 		},
@@ -176,6 +197,13 @@ function createServer(env: ListiniaEnv, userId: string) {
 	server.registerTool(
 		"nota_itens",
 		{
+			title: "Itens de uma nota",
+			annotations: {
+				readOnlyHint: true,
+				destructiveHint: false,
+				idempotentHint: true,
+				openWorldHint: false,
+			},
 			description: "Itens de uma nota específica, item a item.",
 			inputSchema: z.object({ nota_id: z.number().int() }),
 		},
@@ -197,6 +225,13 @@ function createServer(env: ListiniaEnv, userId: string) {
 	server.registerTool(
 		"produto_salvar",
 		{
+			title: "Ajustar um produto da despensa",
+			annotations: {
+				readOnlyHint: false,
+				destructiveHint: true,
+				idempotentHint: false,
+				openWorldHint: false,
+			},
 			description:
 				"Cria ou ajusta UM produto na despensa manualmente. Use para correções ('já usei metade do arroz'), não para registrar compras.",
 			inputSchema: z.object({
@@ -270,6 +305,13 @@ function createServer(env: ListiniaEnv, userId: string) {
 	server.registerTool(
 		"nota_registrar",
 		{
+			title: "Registrar uma compra na despensa",
+			annotations: {
+				readOnlyHint: false,
+				destructiveHint: false,
+				idempotentHint: false,
+				openWorldHint: false,
+			},
 			description:
 				"Registra uma compra inteira de uma vez: grava a nota, os itens, e soma tudo na despensa. É a ferramenta principal — uma chamada por nota fiscal.",
 			inputSchema: z.object({
@@ -388,6 +430,13 @@ function createServer(env: ListiniaEnv, userId: string) {
 	server.registerTool(
 		"produto_remover",
 		{
+			title: "Remover um produto da despensa",
+			annotations: {
+				readOnlyHint: false,
+				destructiveHint: true,
+				idempotentHint: true,
+				openWorldHint: false,
+			},
 			description:
 				"Remove um produto da despensa. Não apaga o histórico de compras — só o estado atual.",
 			inputSchema: z.object({ item: z.string().min(1) }),
@@ -405,6 +454,13 @@ function createServer(env: ListiniaEnv, userId: string) {
 	server.registerTool(
 		"nota_remover",
 		{
+			title: "Apagar uma nota registrada",
+			annotations: {
+				readOnlyHint: false,
+				destructiveHint: true,
+				idempotentHint: true,
+				openWorldHint: false,
+			},
 			description:
 				"Apaga uma nota e seus itens do histórico. NÃO desfaz o que já foi somado na despensa — ajuste os produtos à mão se precisar.",
 			inputSchema: z.object({ nota_id: z.number().int() }),
