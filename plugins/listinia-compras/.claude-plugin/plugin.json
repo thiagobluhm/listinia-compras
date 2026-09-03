@@ -1,6 +1,6 @@
 {
   "name": "listinia-compras",
-  "version": "1.2.1",
+  "version": "1.3.1",
   "description": "Captura notas fiscais por QR code ou foto, reconhece o que ainda tem na geladeira/despensa por foto, mantém sua despensa e seus gastos sempre atualizados no servidor Listinia, gera listas de compras baseadas no seu consumo real e pesquisa preços em encartes de supermercado. Orquestrado por um time de agentes especializados.",
   "author": {
     "name": "Thiago Bluhm — AIstein LTDA"
