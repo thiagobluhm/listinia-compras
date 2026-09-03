@@ -1,0 +1,17 @@
+{
+  "name": "listinia-mercado",
+  "version": "1.1.1",
+  "description": "Para supermercados, farmácias e outros varejos: publica o encarte de ofertas no Listinia a partir de uma planilha (csv, xlsx ou json), confere o que está no ar, e entrega a chave de integração para o ERP publicar sozinho. As ofertas publicadas aparecem para todo consumidor que usa o Listinia para montar a lista de compras. Mede o resultado real de cada encarte pela nota fiscal do consumidor: quem viu, quem comprou e se o preço cobrado bateu com o anunciado.",
+  "author": {
+    "name": "Thiago Bluhm — AIstein LTDA"
+  },
+  "keywords": [
+    "encarte",
+    "ofertas",
+    "supermercado",
+    "farmácia",
+    "varejo",
+    "b2b",
+    "retail media"
+  ]
+}
