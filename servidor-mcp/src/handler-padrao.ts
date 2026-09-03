@@ -11,7 +11,8 @@
  */
 
 import { estabelecimentoPorChave, publicarEncarte } from "./encartes";
-import { GoogleHandler } from "./google-handler";
+import { criarGoogleHandler, type IdentidadeTela } from "./google-handler";
+import { respostaLogo } from "./logo";
 
 interface EnvPublico {
 	DB: D1Database;
@@ -75,10 +76,18 @@ async function publicarPorHttp(request: Request, env: EnvPublico): Promise<Respo
  * O Worker de Compras nao abre a porta do ERP: rotaErp: false faz /v1/encarte
  * simplesmente nao existir la, em vez de existir e recusar.
  */
-export function criarHandlerPadrao(opcoes: { rotaErp: boolean }) {
+export function criarHandlerPadrao(opcoes: {
+	rotaErp: boolean;
+	identidade: IdentidadeTela;
+}) {
+	const google = criarGoogleHandler(opcoes.identidade);
+
 	return {
 		async fetch(request: Request, env: EnvPublico, ctx: ExecutionContext): Promise<Response> {
 			const { pathname } = new URL(request.url);
+
+			// Servido pelos dois Workers: e o logo da tela de aprovacao.
+			if (pathname === "/logo.png") return respostaLogo();
 
 			if (opcoes.rotaErp && pathname === "/v1/encarte") {
 				if (request.method !== "POST") {
@@ -87,7 +96,7 @@ export function criarHandlerPadrao(opcoes: { rotaErp: boolean }) {
 				return publicarPorHttp(request, env);
 			}
 
-			return GoogleHandler.fetch(request, env as never, ctx);
+			return google.fetch(request, env as never, ctx);
 		},
 	};
 }

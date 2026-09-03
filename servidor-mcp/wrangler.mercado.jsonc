@@ -14,19 +14,18 @@
 	"compatibility_flags": ["nodejs_compat"],
 	"observability": { "enabled": true },
 
-	// Assim que a zona listinia.com.br estiver na Cloudflare, descomente o
-	// bloco abaixo, troque MCP_RESOURCE pela URL do dominio proprio e refaca o
-	// deploy. Enquanto isso o host de mercado e o workers.dev.
-	// "routes": [
-	// 	{ "pattern": "mercado-mcp.listinia.com.br", "custom_domain": true }
-	// ],
+	// A zona listinia.com.br ja esta na Cloudflare. O custom_domain cria o
+	// registro DNS sozinho no primeiro deploy.
+	"routes": [
+		{ "pattern": "mercado-mcp.listinia.com.br", "custom_domain": true }
+	],
 
 	"vars": {
 		// Conta Google que recebe a despensa legada no primeiro login.
 		"EMAIL_DONO_LEGADO": "thiagobluhm@gmail.com",
 		// Precisa bater EXATAMENTE com a URL digitada na Claude, /mcp incluido.
-		"MCP_RESOURCE": "https://listinia-mercado.thiagobluhm.workers.dev/mcp"
-		// dominio proprio: "https://mercado-mcp.listinia.com.br/mcp"
+		"MCP_RESOURCE": "https://mercado-mcp.listinia.com.br/mcp"
+		// workers.dev (anterior): "https://listinia-mercado.thiagobluhm.workers.dev/mcp"
 	},
 	"kv_namespaces": [
 		{ "binding": "OAUTH_KV", "id": "ad6da5681bd64333b4af51b0f1758ad1" }

@@ -12,7 +12,7 @@ import { env as envModulo } from "cloudflare:workers";
 import { McpServer } from "@modelcontextprotocol/server";
 import { createMcpHandler } from "agents/mcp/server";
 import { criarHandlerPadrao } from "./handler-padrao";
-import { type PropsListinia } from "./google-handler";
+import { type IdentidadeTela, type PropsListinia } from "./google-handler";
 import type { ListiniaEnv } from "./tipos";
 
 export interface PerfilWorker {
@@ -22,6 +22,8 @@ export interface PerfilWorker {
 	/** URL publica do endpoint /mcp, usada se MCP_RESOURCE nao vier do ambiente. */
 	resourcePadrao: string;
 	resourceName: string;
+	/** O que a pessoa le na tela de aprovacao do OAuth. */
+	identidade: IdentidadeTela;
 	escopos: string[];
 	/** Expoe POST /v1/encarte (a porta do ERP do lojista). So o perfil mercado. */
 	rotaErp: boolean;
@@ -57,7 +59,10 @@ export function criarWorker(perfil: PerfilWorker) {
 	return new OAuthProvider({
 		apiRoute: "/mcp",
 		apiHandler: mcpApiHandler,
-		defaultHandler: criarHandlerPadrao({ rotaErp: perfil.rotaErp }),
+		defaultHandler: criarHandlerPadrao({
+			rotaErp: perfil.rotaErp,
+			identidade: perfil.identidade,
+		}),
 
 		authorizeEndpoint: "/authorize",
 		tokenEndpoint: "/token",

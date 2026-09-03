@@ -30,6 +30,12 @@ interface AuthEnv {
 	EMAIL_DONO_LEGADO?: string;
 }
 
+/** O que a pessoa le na tela de aprovacao. Muda entre Compras e Mercado. */
+export interface IdentidadeTela {
+	nome: string;
+	descricao: string;
+}
+
 /** O que fica no token e chega em ctx.props do lado do MCP. */
 export interface PropsListinia {
 	userId: string;
@@ -97,7 +103,11 @@ function redirecionarAoGoogle(
 	return new Response(null, { status: 302, headers: cabecalhos });
 }
 
-async function autorizarGet(request: Request, env: AuthEnv): Promise<Response> {
+async function autorizarGet(
+	request: Request,
+	env: AuthEnv,
+	identidade: IdentidadeTela,
+): Promise<Response> {
 	const pedido = await env.OAUTH_PROVIDER.parseAuthRequest(request);
 	if (!pedido.clientId) return new Response("Pedido inválido", { status: 400 });
 
@@ -116,10 +126,12 @@ async function autorizarGet(request: Request, env: AuthEnv): Promise<Response> {
 		client: await env.OAUTH_PROVIDER.lookupClient(pedido.clientId),
 		csrfToken,
 		server: {
-			name: "Listinia — sua despensa",
-			description:
-				"Conectando, o Listinia passa a ler e atualizar a sua despensa: compras registradas, o que tem em casa e o que está acabando.",
-			logo: "",
+			name: identidade.nome,
+			description: identidade.descricao,
+			// O sanitizeUrl so aceita http/https, entao o logo e servido pelo
+			// proprio Worker em /logo.png. Montado a partir do host da
+			// requisicao: funciona no workers.dev e no dominio proprio.
+			logo: new URL("/logo.png", request.url).href,
 		},
 		setCookie,
 		state: { oauthReqInfo: pedido },
@@ -222,15 +234,17 @@ async function retorno(request: Request, env: AuthEnv): Promise<Response> {
 	return new Response(null, { status: 302, headers: h });
 }
 
-export const GoogleHandler = {
-	async fetch(request: Request, env: AuthEnv, _ctx?: ExecutionContext): Promise<Response> {
-		const { pathname } = new URL(request.url);
-		if (pathname === "/authorize") {
-			if (request.method === "GET") return autorizarGet(request, env);
-			if (request.method === "POST") return autorizarPost(request, env);
-			return new Response("Método não permitido", { status: 405 });
-		}
-		if (pathname === "/callback" && request.method === "GET") return retorno(request, env);
-		return new Response("Not found", { status: 404 });
-	},
-};
+export function criarGoogleHandler(identidade: IdentidadeTela) {
+	return {
+		async fetch(request: Request, env: AuthEnv, _ctx?: ExecutionContext): Promise<Response> {
+			const { pathname } = new URL(request.url);
+			if (pathname === "/authorize") {
+				if (request.method === "GET") return autorizarGet(request, env, identidade);
+				if (request.method === "POST") return autorizarPost(request, env);
+				return new Response("Método não permitido", { status: 405 });
+			}
+			if (pathname === "/callback" && request.method === "GET") return retorno(request, env);
+			return new Response("Not found", { status: 404 });
+		},
+	};
+}
