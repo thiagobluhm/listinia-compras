@@ -15,7 +15,7 @@ o time de TI da loja construir: o endereço, o formato e a chave.
 ## O que entregar
 
 ```
-POST https://listinia-despensa.thiagobluhm.workers.dev/v1/encarte
+POST https://mercado-mcp.listinia.com.br/v1/encarte
 Authorization: Bearer <chave do estabelecimento>
 Idempotency-Key: <hash do arquivo>
 Content-Type: application/json
