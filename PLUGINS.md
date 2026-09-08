@@ -132,6 +132,59 @@ leitura.
 
 ## Instalação
 
-Instale o **plugin** (`plugins/listinia-compras.zip`), não só o conector. O
-conector sozinho entrega as ferramentas cruas, sem as skills e sem os agentes
-— e é o plugin que já traz a URL certa do MCP pré-preenchida.
+Mande **só o `.zip`**. Ele já carrega a URL do MCP dentro.
+
+| Quem vai usar | Arquivo |
+|---|---|
+| consumidor | `plugins/listinia-compras.zip` |
+| lojista — mercado, farmácia | `plugins/listinia-mercado.zip` |
+
+Quem é lojista e também quer usar em casa instala os dois: a mesma conta
+Google serve ambos.
+
+Do lado de quem recebe:
+
+1. instalar o `.zip`;
+2. abrir a aba **Conectores** — o endereço já vem preenchido pelo plugin;
+3. entrar com a conta Google.
+
+### Só a URL do MCP × o plugin completo
+
+Mandar só a URL adiciona o conector sem o plugin. Conecta e as ferramentas
+respondem — mas é meio sistema, porque os recursos principais **não são
+ferramentas MCP**, são agentes que vivem dentro do plugin.
+
+**Compras:**
+
+| | só a URL | plugin completo |
+|---|---|---|
+| Ver despensa, o que está acabando | sim | sim |
+| Buscar ofertas / cotar lista pronta | sim | sim |
+| Registrar nota digitando item a item | sim | sim |
+| **Ler nota por QR code** (página da SEFAZ) | **não** | sim |
+| **Ler nota por foto do cupom** | **não** | sim |
+| **Gerar a lista de compras** | **não** | sim |
+| **Dashboard de gastos** | **não** | sim |
+| **Reconhecer fotos da geladeira/despensa** | **não** | sim |
+| **Regra `jamais-inventar`** | **não** | sim |
+
+**Mercado:**
+
+| | só a URL | plugin completo |
+|---|---|---|
+| Cadastrar loja, pegar a chave de API | sim | sim |
+| Ver o que está no ar, apagar encarte | sim | sim |
+| Publicar encarte montando o JSON na mão | sim | sim |
+| **Publicar a partir da planilha da loja** | **não** | sim |
+| **Relatório de desempenho interpretado** | **não** | sim |
+| **Regra `jamais-inventar`** | **não** | sim |
+
+A última linha é a que pesa mais: `nota_registrar`, `produto_salvar` e
+`encarte_publicar` gravam do mesmo jeito sem o plugin — só que sem a trava
+que proíbe chutar quantidade, preço ou coluna de planilha. Meio sistema com
+permissão de escrita inteira.
+
+O `.zip` é artefato de build, não a fonte. Ao mexer em
+`plugins/listinia-compras/` ou `plugins/listinia-mercado/`, suba a `version`
+no `plugin.json` e regere o pacote — senão o Claude nem trata como
+atualização, e sai um binário com conteúdo mais velho que o repositório.
