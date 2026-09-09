@@ -24,7 +24,6 @@
 		"EMAIL_DONO_LEGADO": "thiagobluhm@gmail.com",
 		// Precisa bater EXATAMENTE com a URL digitada na Claude, /mcp incluido.
 		"MCP_RESOURCE": "https://compras-mcp.listinia.com.br/mcp"
-		// workers.dev (anterior): "https://listinia-compras.thiagobluhm.workers.dev/mcp"
 	},
 	"kv_namespaces": [
 		{ "binding": "OAUTH_KV", "id": "ad6da5681bd64333b4af51b0f1758ad1" }
