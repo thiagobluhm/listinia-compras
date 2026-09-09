@@ -2,7 +2,7 @@
   "mcpServers": {
     "listinIA": {
       "type": "http",
-      "url": "https://listinia-compras.thiagobluhm.workers.dev/mcp"
+      "url": "https://compras-mcp.listinia.com.br/mcp"
     },
     "playwright": {
       "command": "npx",
