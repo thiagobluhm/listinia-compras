@@ -132,6 +132,8 @@ leitura.
 
 ## Instalação
 
+### No Claude
+
 Mande **só o `.zip`**. Ele já carrega a URL do MCP dentro.
 
 | Quem vai usar | Arquivo |
@@ -147,6 +149,35 @@ Do lado de quem recebe:
 1. instalar o `.zip`;
 2. abrir a aba **Conectores** — o endereço já vem preenchido pelo plugin;
 3. entrar com a conta Google.
+
+### No Codex
+
+O mesmo produto tem uma versão para o Codex em `codex-plugins/`, apontando
+para os **mesmos** servidores MCP e com as mesmas skills — 7 em Compras, 5 em
+Mercado. O que não vai junto são os **agentes**: eles são um recurso do
+Claude. Por isso a coluna "plugin completo" das tabelas abaixo descreve o
+lado Claude; no Codex, o que as skills não cobrem sozinhas não acontece.
+
+| Quem vai usar | Pasta |
+|---|---|
+| consumidor | `codex-plugins/listinia-compras/` |
+| lojista — mercado, farmácia | `codex-plugins/listinia-mercado/` |
+
+Não há `.zip` gerado para o Codex: a entrega é a pasta, com o manifesto em
+`.codex-plugin/plugin.json`.
+
+**Trocar de cliente não custa dado nenhum.** Quem usa no Claude hoje e migra
+para o Codex amanhã encontra a própria despensa, item por item: a identidade
+é o `sub` da **conta Google**, resolvido para um id interno estável, e é ele
+que escopa cada linha do banco. O cliente é só transporte. O que se refaz na
+troca é a autorização, não os dados — e a única forma real de perder tudo é
+entrar com **outra** conta Google, porque não existe fusão de contas.
+
+**As duas numerações são independentes.** Claude e Codex são pacotes
+distintos, com conteúdo distinto, e cada um sobe de versão quando a própria
+pasta muda. Hoje: Compras `1.3.1` no Claude e `1.2.1` no Codex; Mercado
+`1.1.2` no Claude e `1.2.1` no Codex. Igualar exigiria baixar a versão de um
+dos lados, e versão que anda para trás nunca chega a quem já instalou.
 
 ### Só a URL do MCP × o plugin completo
 

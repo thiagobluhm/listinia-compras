@@ -1,6 +1,6 @@
 {
   "name": "listinia-compras",
-  "version": "1.2.0",
+  "version": "1.2.1",
   "description": "Gerencia despensa, notas fiscais, gastos, listas de compras e ofertas de mercado com dados do servidor Listinia.",
   "author": { "name": "Thiago Bluhm — AIstein LTDA" },
   "license": "MIT",

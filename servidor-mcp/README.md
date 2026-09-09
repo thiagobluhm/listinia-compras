@@ -1,141 +1,83 @@
-# Listinia — servidor MCP da despensa
+# Listinia — os dois Workers MCP
 
-Servidor MCP remoto que guarda a despensa em **SQLite** (Cloudflare D1) e expõe
-READ, CREATE, UPDATE e DELETE como ferramentas.
+Este diretório é o **servidor**. O que cada plugin faz, para quem serve e como
+se instala está no [`PLUGINS.md`](../PLUGINS.md) da raiz — é a fonte de verdade
+do produto, e não se repete aqui.
 
-Substitui o arquivo `despensa.jsonl` no Google Drive. A diferença que importa:
-registrar uma nota passou a ser **uma chamada com os itens**, em vez de reescrever
-o arquivo inteiro. O tempo de gravação para de crescer conforme a despensa cresce.
+Aqui fica só o que o `PLUGINS.md` não cobre: como isto sobe e como se mexe.
 
----
+## A forma
 
-## Ferramentas expostas
+Dois Workers da Cloudflare, hosts separados, **mesmo D1 e mesmo KV de OAuth**:
 
-| Ferramenta | O que faz |
-|---|---|
-| `despensa_listar` | Estado atual, um registro por produto. Filtra por categoria ou nome. |
-| `despensa_status` | Dias restantes e status (`crítico` / `baixo` / `ok`) de cada item. |
-| `notas_listar` | Histórico de compras. |
-| `nota_itens` | Itens de uma nota específica. |
-| `nota_registrar` | **A principal.** Grava a nota, os itens e soma tudo na despensa, numa chamada só. |
-| `produto_salvar` | Cria ou ajusta um produto à mão (`definir` ou `somar`). |
-| `produto_remover` | Tira um produto do estado atual. |
-| `nota_remover` | Apaga uma nota do histórico. |
+| Worker | Host | Entrypoint | Ferramentas |
+|---|---|---|---|
+| `listinia-compras` | `compras-mcp.listinia.com.br` | `src/compras.ts` | 10 — despensa, notas, ofertas |
+| `listinia-mercado` | `mercado-mcp.listinia.com.br` | `src/mercado.ts` | 8 — encarte, cadastro, desempenho |
 
-`nota_registrar` aceita a **chave de acesso da NFC-e**. Se a mesma chave chegar
-duas vezes, a nota não é gravada de novo — protege contra registro duplicado.
+O que muda entre os dois é só o conjunto de ferramentas, os escopos e o
+resource metadata — nada de schema, nada de migration. A fábrica comum está em
+`src/entrypoint.ts`; cada entrypoint é uma chamada a `criarWorker()`.
 
-Categoria vem em branco? É classificada automaticamente pela tabela de
-`src/categorias.ts`, portada do `categorizer.py` do app.
+Só o de mercado expõe **`POST /v1/encarte`**, a porta do ERP do lojista,
+autenticada pela chave do estabelecimento (`Authorization: Bearer`).
 
----
+## Autenticação
 
-## Deploy (uma vez, ~10 minutos)
+**Google OAuth** com Dynamic Client Registration, feito pelo
+`@cloudflare/workers-oauth-provider`. A tela de consentimento e o vai-e-volta
+com o Google estão em `src/google-handler.ts`.
 
-Pré-requisito: Node 18+ e uma conta Cloudflare.
+A identidade é o `sub` do Google, resolvido em `resolverUsuario()` para um id
+interno estável (`u_...`) com `UNIQUE (provedor, provedor_sub)`. Esse id vira
+`props.userId` no token e escopa **toda** query do banco. Consequência: o
+cliente MCP não é dono de nada — a mesma conta Google no Claude e no Codex é a
+mesma despensa. Requisição sem `props.userId` recebe 401 em vez de ser servida.
+
+`EMAIL_DONO_LEGADO` é a exceção histórica: no primeiro login, essa conta é
+vinculada ao `u_legado` para não encontrar a casa vazia. Vale uma vez.
+
+E-mail do Google não verificado é recusado com 403 — e-mail não verificado não
+serve de identidade quando é ele que liga alguém aos dados antigos.
+
+## Subir
 
 ```bash
 npm install
 npx wrangler login
+
+npm run db:schema        # cria as tabelas no D1 remoto (uma vez)
+npm run deploy           # os dois Workers
 ```
 
-**1. Criar o banco**
+`deploy:compras` e `deploy:mercado` sobem um de cada vez. **Não há CI:** o
+deploy é sempre manual, e merge na `main` não publica nada.
+
+Segredos (uma vez por conta, `npx wrangler secret put <nome>` com o `-c` do
+Worker): `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `COOKIE_ENCRYPTION_KEY`.
+
+`MCP_RESOURCE` fica em `vars` no `wrangler.*.jsonc` e precisa bater
+**exatamente** com a URL que o cliente usa, `/mcp` incluído. Divergiu, a
+descoberta do OAuth falha.
+
+## Mexer
 
 ```bash
-npx wrangler d1 create listinia
+npm run dev:compras      # localhost:8787
+npm run dev:mercado      # localhost:8788
+npm run db:local         # tabelas no SQLite local
+npm run type-check       # tsc --noEmit
+npm run cf-typegen       # regera worker-configuration.d.ts
 ```
 
-O comando devolve um `database_id`. Cole ele em `wrangler.jsonc`, no lugar de
-`PREENCHER_APOS_CRIAR_O_BANCO`.
+`worker-configuration.d.ts` é **gerado**. Mudou `wrangler.compras.jsonc`, rode
+`cf-typegen` em vez de editar o arquivo à mão.
 
-**2. Criar as tabelas**
-
-```bash
-npm run db:schema
-```
-
-**3. Definir o segredo de acesso**
-
-```bash
-npx wrangler secret put LISTINIA_TOKEN
-```
-
-Cole uma string longa e aleatória (ex.: saída de `openssl rand -hex 24`).
-Guarde — ela faz parte da URL.
-
-**4. Publicar**
-
-```bash
-npm run deploy
-```
-
-**5. Conectar no Claude**
-
-A URL do conector é:
-
-```
-https://listinia-despensa.<seu-subdominio>.workers.dev/<LISTINIA_TOKEN>/mcp
-```
-
-No app do Claude: **Configurações → Conectores → Adicionar conector
-personalizado** e cole a URL. Servidor colocado direto no arquivo de config
-**não** conecta — tem que ser por aí.
-
----
-
-## Sobre a autenticação
-
-Esta versão usa **segredo no caminho da URL**. Quem tiver a URL inteira acessa a
-despensa; quem não tiver recebe 404. Para uma despensa doméstica com URL não
-divulgada, resolve — mas é obscuridade, não autenticação de verdade.
-
-Se `LISTINIA_TOKEN` não for definido, o servidor fica **aberto**. Não faça isso.
-
-O caminho definitivo é OAuth com Dynamic Client Registration (o Claude não
-aceita client ID/secret colado à mão). A Cloudflare tem exemplo pronto disso —
-fica como próximo passo, não como impedimento para usar hoje.
-
----
-
-## Rodar local
-
-```bash
-npm run db:local     # cria as tabelas no SQLite local
-npm run dev          # sobe em http://localhost:8787
-```
-
-Sem `LISTINIA_TOKEN` definido no ambiente local, o endereço é
-`http://localhost:8787/mcp`.
-
----
+`_legado/` guarda a geração anterior — um Worker só, autenticado por segredo no
+caminho da URL. Está ali como histórico; nada em `src/` depende dele.
 
 ## Custo
 
-Dentro do plano gratuito da Cloudflare, com folga enorme para este uso:
-
-- 5 milhões de linhas lidas por dia
-- 100 mil linhas escritas por dia
-- 5 GB de armazenamento
-
-Uma nota de 43 itens gasta 86 escritas. Workers não cobra por serviço ocioso.
-
----
-
-## Estado de validação
-
-Testado ponta a ponta com `wrangler dev` local e a nota real do Supermercados
-Cometa (24/08/2026, 43 itens, R$ 509,25):
-
-- os 43 itens gravados; soma dos itens = total da nota
-- 38 produtos distintos (os 5 itens repetidos foram somados corretamente)
-- categorização conferida por amostragem
-- ajuste manual preservando a unidade original
-- remoção de produto
-- rejeição de nota duplicada pela chave
-
-## Migração do Google Drive
-
-O `despensa.jsonl` que existe hoje no Drive **ainda não foi migrado**. Ele usa
-chaves curtas (`i`, `c`, `q`, `u`, `cm`, `uc`, `p`) que mapeiam direto para as
-colunas de `produtos`. A migração é uma leitura do arquivo e uma sequência de
-`produto_salvar` — feita uma vez, depois do deploy.
+Dentro do plano gratuito da Cloudflare, com folga grande para este uso: 5
+milhões de linhas lidas por dia, 100 mil escritas, 5 GB. Uma nota de 43 itens
+gasta 86 escritas, e Workers não cobra por serviço ocioso.
