@@ -29,6 +29,11 @@
 	// serve para apontar o webhook da Z-API. O domínio entra quando o produto
 	// sair do teste com uma pessoa.
 
+	// Browser Run (ex-Browser Rendering): Chrome headless para abrir a pagina da
+	// NFC-e na Receita. As SEFAZ montam a tabela de itens por JavaScript, entao
+	// um `fetch` traz HTML vazio e a nota parece nao ter item nenhum.
+	"browser": { "binding": "NAVEGADOR" },
+
 	"d1_databases": [
 		{
 			"binding": "DB",

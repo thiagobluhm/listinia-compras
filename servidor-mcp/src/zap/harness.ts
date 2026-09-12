@@ -21,6 +21,8 @@ import { AnthropicFoundry } from "@anthropic-ai/foundry-sdk";
 import { betaTool } from "@anthropic-ai/sdk/helpers/beta/json-schema";
 import { abrirFerramentas, type FerramentaLLM } from "./ferramentas";
 import { buscarUsuarioPorTelefone, criarUsuario, ehAceite } from "./identidade";
+import { lerQrDoCupom } from "./cupom";
+import { lerPaginaNfce } from "./nfce";
 import { registrarTurno } from "./uso";
 import type { MensagemRecebida } from "./zapi";
 
@@ -89,6 +91,19 @@ No lugar disso:
 Sempre diga o que ficou de fora antes de gravar qualquer coisa. Nada entra na
 despensa com um buraco silencioso.
 
+FOTO DE CUPOM — quando a nota chega por imagem e NÃO por QR.
+Isto é exceção, não o caminho normal. Quando o QR é lido, os itens vêm da
+Receita e não há nada para você interpretar.
+- Olhe a foto UMA VEZ, inteira, como ela está. Não peça recorte, não peça
+  outra luz, não tente de novo por outro ângulo.
+- Ficar decifrando cupom desbotado não é persistência: é o caminho curto para
+  inventar item e preço. Uma foto nova custa cinco segundos — peça outra.
+- Se a numeração dos itens não começa em 001, ou o total não bate com a soma
+  do que você leu, é pedaço de cupom. Diga isso e NÃO registre como se fosse a
+  compra inteira.
+- Normalizar nome é reescrever o que está escrito ("LEITE INTEG UHT 1L" ->
+  "Leite Integral 1L"), nunca completar o que faltou.
+
 Você fala por WhatsApp: respostas curtas, sem markdown pesado, sem tabela.`;
 
 /** O schema que `betaTool` aceita, sem depender de `json-schema-to-ts` direto. */
@@ -101,6 +116,8 @@ export interface ConfigModelo {
 	apiKey: string;
 	/** Deployment do Foundry. Ex.: claude-opus-5, claude-sonnet-5, claude-haiku-4-5. */
 	modelo: string;
+	/** Binding do Browser Run, para abrir a página da NFC-e. */
+	navegador: Fetcher;
 }
 
 export interface EntradaModelo {
@@ -108,6 +125,8 @@ export interface EntradaModelo {
 	ferramentas: FerramentaLLM[];
 	mensagem: MensagemRecebida;
 	chamar(nome: string, argumentos: Record<string, unknown>): Promise<string>;
+	/** URL da NFC-e lida do QR da foto, quando houve. Decide o caminho do turno. */
+	urlNfce: string | null;
 }
 
 /**
@@ -129,7 +148,7 @@ async function chamarModelo(entrada: EntradaModelo, cfg: ConfigModelo): Promise<
 	// tempo de execução, vindos do servidor MCP, então não há o que inferir — a
 	// validação do argumento continua acontecendo, só que no runner e não no
 	// compilador. Quem garante a forma é o MCP, que só emite schema de objeto.
-	const ferramentas = entrada.ferramentas.map((f) =>
+	const ferramentas: ReturnType<typeof betaTool>[] = entrada.ferramentas.map((f) =>
 		betaTool({
 			name: f.name,
 			description: f.description,
@@ -139,10 +158,40 @@ async function chamarModelo(entrada: EntradaModelo, cfg: ConfigModelo): Promise<
 		}),
 	);
 
-	// A foto do cupom é o caso de uso principal, então ela entra como imagem de
-	// verdade e não como link no texto. A URL vem da Z-API e é pública.
+	// A ferramenta que só existe neste perfil: abrir a página oficial da nota.
+	// Ela entra ao lado das 10 do MCP, e o runner não distingue uma da outra.
+	if (entrada.urlNfce) {
+		const url = entrada.urlNfce;
+		ferramentas.push(
+			betaTool({
+				name: "cupom_ler",
+				description:
+					"Abre a página oficial da NFC-e desta foto na Receita e devolve o texto dela, " +
+					"com estabelecimento, data, itens, quantidades e preços. Use SEMPRE que a " +
+					"mensagem trouxer um cupom com QR: é a fonte oficial dos valores.",
+				inputSchema: { type: "object", properties: {}, additionalProperties: false },
+				run: async () => {
+					const r = await lerPaginaNfce(cfg.navegador, url);
+					return r.texto ?? `Não deu para ler a nota: ${r.motivo}`;
+				},
+			}),
+		);
+	}
+
+	// DOIS CAMINHOS, e a escolha já foi feita antes de chegar aqui.
+	//
+	// Com QR: a imagem NÃO é enviada. Mandar a foto junto convidaria o modelo a
+	// conferir número na imagem, que é exatamente o que este desenho evita — e
+	// ainda custaria os tokens de visão à toa.
+	//
+	// Sem QR: a foto vai, e valem as regras de foto de cupom do system prompt.
 	const conteudo: Array<Record<string, unknown>> = [];
-	if (entrada.mensagem.imagemUrl) {
+	if (entrada.urlNfce) {
+		conteudo.push({
+			type: "text",
+			text: "[A foto traz um cupom com QR code de NFC-e. Chame `cupom_ler` para pegar os itens oficiais na Receita — não tente adivinhar valores.]",
+		});
+	} else if (entrada.mensagem.imagemUrl) {
 		conteudo.push({ type: "image", source: { type: "url", url: entrada.mensagem.imagemUrl } });
 	}
 	conteudo.push({ type: "text", text: entrada.mensagem.texto || "(mensagem sem texto)" });
@@ -203,6 +252,11 @@ export async function processarMensagem(
 	const turnos = await registrarTurno(db, userId, new Date().toISOString().slice(0, 10));
 	if (turnos > limiteTurnosDia) return TEXTO_TETO;
 
+	// QR ANTES DO MODELO. Não custa token e decide o caminho do turno: com QR os
+	// valores virão da Receita; sem QR, o modelo olha a foto uma vez e o prompt
+	// já diz o que ele pode e não pode concluir dela.
+	const leitura = mensagem.imagemUrl ? await lerQrDoCupom(mensagem.imagemUrl) : null;
+
 	const ferramentas = await abrirFerramentas(db, userId);
 	try {
 		return await chamarModelo(
@@ -211,6 +265,7 @@ export async function processarMensagem(
 				ferramentas: ferramentas.defs,
 				mensagem,
 				chamar: ferramentas.chamar,
+				urlNfce: leitura?.urlNfce ?? null,
 			},
 			cfg,
 		);

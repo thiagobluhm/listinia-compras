@@ -21,10 +21,13 @@
 	},
 	"dependencies": {
 		"@anthropic-ai/foundry-sdk": "^0.4.6",
+		"@cloudflare/puppeteer": "^1.4.0",
 		"@cloudflare/workers-oauth-provider": "^0.10.3",
 		"@modelcontextprotocol/sdk": "1.30.0",
 		"@modelcontextprotocol/server": "2.0.0",
 		"agents": "^0.20.1",
+		"jpeg-js": "^0.4.4",
+		"jsqr": "^1.4.0",
 		"zod": "^4.4.3"
 	},
 	"devDependencies": {

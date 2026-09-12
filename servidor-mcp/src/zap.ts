@@ -24,6 +24,8 @@ interface ZapEnv extends ListiniaEnv {
 	FOUNDRY_MODELO: string;
 	/** Teto de turnos por pessoa por dia. Var do wrangler: ajustar sem deploy de código. */
 	LIMITE_TURNOS_DIA: string;
+	/** Browser Run, para abrir a página oficial da NFC-e. */
+	NAVEGADOR: Fetcher;
 }
 
 export default {
@@ -70,6 +72,7 @@ export default {
 							resource: env.FOUNDRY_RESOURCE,
 							apiKey: env.FOUNDRY_API_KEY,
 							modelo: env.FOUNDRY_MODELO,
+							navegador: env.NAVEGADOR,
 						},
 						Number(env.LIMITE_TURNOS_DIA) || 30,
 					);
