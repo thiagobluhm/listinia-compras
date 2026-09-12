@@ -281,7 +281,7 @@ async function chamarModelo(
 						`${i?.cidade ?? "?"}/${i?.uf ?? "?"}. ` +
 						(i?.nome
 							? `Nome: ${i.nome}.`
-							: "As duas leituras DISCORDARAM do nome — pergunte à pessoa como se chama esse mercado, e não escolha um por conta.") +
+							: `As duas leituras DISCORDARAM do nome. ${loja.pergunta ?? ""} Não escolha um por conta.`) +
 						(loja.estabelecimentoId ? " Já está cadastrado." : "")
 					: `[Não consegui confirmar a loja. ${loja.pergunta}]`,
 		});

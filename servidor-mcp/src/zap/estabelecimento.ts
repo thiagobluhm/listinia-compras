@@ -31,6 +31,8 @@ export interface IdentidadeLoja {
 	/** 14 dígitos, já validados. Null quando ilegível ou com dígito verificador errado. */
 	cnpj: string | null;
 	nome: string | null;
+	/** O bairro é o desempatador: a pessoa sabe dele de cor, do nome ela duvida. */
+	bairro: string | null;
 	cidade: string | null;
 	uf: string | null;
 }
@@ -75,7 +77,7 @@ export function cnpjValido(valor: string): boolean {
 export const PROMPT_WORKER = `Você lê APENAS o cabeçalho de um cupom fiscal brasileiro e devolve quem é a loja.
 
 Responda SÓ com um objeto JSON, sem texto antes ou depois, neste formato:
-{"cnpj": "...", "nome": "...", "cidade": "...", "uf": ".."}
+{"cnpj": "...", "nome": "...", "bairro": "...", "cidade": "...", "uf": ".."}
 
 Regras, sem exceção:
 - Copie o que está IMPRESSO. Não corrija nome que pareça estranho, não complete
@@ -119,6 +121,7 @@ async function lerIdentidade(
 		return {
 			cnpj: cnpjValido(cnpj) ? cnpj : null,
 			nome: txt(bruto.nome),
+			bairro: txt(bruto.bairro),
 			cidade: txt(bruto.cidade),
 			uf: txt(bruto.uf),
 		};
@@ -126,6 +129,32 @@ async function lerIdentidade(
 		// Worker que cai não derruba o turno: o judge trata como leitura ausente.
 		return null;
 	}
+}
+
+/**
+ * A pergunta que se faz à pessoa quando o judge não fecha.
+ *
+ * FECHADA e ancorada no bairro, de propósito. Perguntar "li Conata e Cometa,
+ * qual é o certo?" expõe a confusão da máquina e oferece duas opções erradas.
+ * "É o Cometa da Maraponga?" é respondível com uma palavra por alguém que está
+ * no sofá — o bairro a pessoa sabe de cor, do nome ela duvida tanto quanto nós.
+ * E um "não, é o Comata" vale mais que qualquer leitura: é a fonte humana, e
+ * vira o nome canônico da loja.
+ */
+function perguntaFechada(nome: string | null, bairro: string | null, cidade: string | null): string {
+	// "o Supermercados Cometa Ltda da Maraponga" é como fala um cartório. Gente
+	// fala "o Cometa da Maraponga". O casco societário sai SÓ da pergunta — o
+	// nome completo continua no que foi lido e no que se grava.
+	const curto = nome
+		?.replace(/\b(suo?permercados?|mercadinho|comercial|distribuidora|atacad(ao|ista))\b/gi, "")
+		.replace(/\b(ltda|me|epp|eireli|s\.?\/?a|cia)\b\.?/gi, "")
+		.replace(/\s{2,}/g, " ")
+		.trim();
+	const onde = bairro ?? cidade;
+	const alvo = (curto || nome) ? (onde ? `${curto || nome} da ${onde}` : (curto || nome)) : null;
+	return alvo
+		? `Rapidinho: esse mercado é o ${alvo}? Se não for, me diz o nome certo dele.`
+		: "Só uma coisa: qual o nome do mercado onde você comprou?";
 }
 
 /**
@@ -154,7 +183,7 @@ export function julgar(a: IdentidadeLoja | null, b: IdentidadeLoja | null): Vere
 		return {
 			...base,
 			status: "divergente",
-			pergunta: `Só consegui uma leitura do cabeçalho: ${so.nome ?? "loja sem nome legível"}. Confirma?`,
+			pergunta: perguntaFechada(so.nome, so.bairro, so.cidade),
 		};
 	}
 
@@ -170,6 +199,9 @@ export function julgar(a: IdentidadeLoja | null, b: IdentidadeLoja | null): Vere
 			...base,
 			status: "acordo",
 			identidade: { ...x, nome: mesmoNome ? (x.nome ?? y.nome) : null },
+			// Identidade resolvida, grafia não. A pergunta vai junto para o turno
+			// confirmar o nome sem travar o registro: o CNPJ já basta para gravar.
+			pergunta: mesmoNome ? null : perguntaFechada(y.nome ?? x.nome, x.bairro ?? y.bairro, x.cidade ?? y.cidade),
 		};
 	}
 	if ((x.cnpj && !y.cnpj) || (y.cnpj && !x.cnpj)) {
@@ -185,13 +217,16 @@ export function julgar(a: IdentidadeLoja | null, b: IdentidadeLoja | null): Vere
 			...base,
 			status: "acordo",
 			identidade: { ...comCnpj, nome: mesmoNome ? comCnpj.nome : null },
+			pergunta: mesmoNome
+				? null
+				: perguntaFechada(comCnpj.nome, comCnpj.bairro ?? x.bairro ?? y.bairro, comCnpj.cidade),
 		};
 	}
 	if (x.cnpj && y.cnpj && x.cnpj !== y.cnpj) {
 		return {
 			...base,
 			status: "divergente",
-			pergunta: "Li dois CNPJs diferentes no cupom. Me diz o nome do mercado, por favor?",
+			pergunta: perguntaFechada(x.nome ?? y.nome, x.bairro ?? y.bairro, x.cidade ?? y.cidade),
 		};
 	}
 
@@ -205,7 +240,7 @@ export function julgar(a: IdentidadeLoja | null, b: IdentidadeLoja | null): Vere
 	return {
 		...base,
 		status: "divergente",
-		pergunta: `Não tenho certeza do mercado: li "${x.nome ?? "?"}" e "${y.nome ?? "?"}". Qual é o certo?`,
+		pergunta: perguntaFechada(y.nome ?? x.nome, x.bairro ?? y.bairro, x.cidade ?? y.cidade),
 	};
 }
 
