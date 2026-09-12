@@ -1,0 +1,31 @@
+/**
+ * Listinia — Worker do WHATSAPP (harness próprio, canal Z-API)
+ * Terceiro perfil. Não é servidor MCP: não tem /mcp, não sobe OAuth.
+ * As mesmas ferramentas de compras, chamadas em memória, sobre o mesmo D1.
+ *
+ * Deploy: npm run deploy:zap
+ *
+ * Segredos (NUNCA no jsonc — `wrangler secret put -c wrangler.zap.jsonc`):
+ *   ZAPI_INSTANCIA, ZAPI_TOKEN, ZAPI_CLIENT_TOKEN, ZAPI_WEBHOOK_SEGREDO
+ * A chave do provider de LLM entra aqui quando o provider for escolhido.
+ */
+{
+	"$schema": "node_modules/wrangler/config-schema.json",
+	"name": "listinia-zap",
+	"main": "src/zap.ts",
+	"compatibility_date": "2026-07-02",
+	"compatibility_flags": ["nodejs_compat"],
+	"observability": { "enabled": true },
+
+	// Sem custom_domain enquanto for MVP de um número só: a URL workers.dev
+	// serve para apontar o webhook da Z-API. O domínio entra quando o produto
+	// sair do teste com uma pessoa.
+
+	"d1_databases": [
+		{
+			"binding": "DB",
+			"database_name": "listinia",
+			"database_id": "352349d4-ff27-4322-b605-14a9a32ed842"
+		}
+	]
+}
