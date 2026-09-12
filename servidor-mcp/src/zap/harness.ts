@@ -123,8 +123,29 @@ export interface ConfigModelo {
 	/** Nome do recurso: https://{resource}.services.ai.azure.com/anthropic/v1 */
 	resource: string;
 	apiKey: string;
-	/** Deployment do Foundry. Ex.: claude-opus-5, claude-sonnet-5, claude-haiku-4-5. */
+	/** Deployment do Foundry para CONVERSA. Ex.: claude-haiku-4-5. */
 	modelo: string;
+	/**
+	 * Deployment para turnos COM IMAGEM. Modelo maior, e a razão é medida.
+	 *
+	 * A mesma foto de cupom (22 itens, papel térmico amassado, fotografado de
+	 * lado) foi lida pelos três, com este mesmo system prompt:
+	 *
+	 * - haiku-4-5  : trocou Ovos por "Uvas", Pimenta por "Mineta", Bife por
+	 *                "Rife"; perdeu as quantidades de 2 e 4 unidades; devolveu
+	 *                só o preço unitário. No item de pimenta isso registraria
+	 *                R$ 29,98 no lugar de R$ 1,05 pagos.
+	 * - sonnet-5   : acertou itens e valores, mas leu o ANO errado e afirmou
+	 *                como fato, e narrou uma chamada de ferramenta que não fez.
+	 * - opus-5     : os 22 itens corretos com unitário E total, conferiu que a
+	 *                numeração fecha com o total declarado, e rotulou a data
+	 *                como suposição a confirmar.
+	 *
+	 * Ler cupom errado envenena `itens_nota.preco_unitario`, que é o histórico
+	 * de preço pago — o único dado do produto que não se copia. Economizar aqui
+	 * é economizar no ativo.
+	 */
+	modeloVisao: string;
 	/** Binding do Browser Run, para abrir a página da NFC-e. */
 	navegador: Fetcher;
 }
@@ -215,9 +236,13 @@ async function chamarModelo(entrada: EntradaModelo, cfg: ConfigModelo): Promise<
 	}
 	conteudo.push({ type: "text", text: entrada.mensagem.texto || "(mensagem sem texto)" });
 
+	// Foto no turno -> modelo de visão, e mais espaço: uma nota de 22 itens vira
+	// uma chamada de ferramenta longa, e truncar no meio perde itens em silêncio.
+	const temImagem = Boolean(entrada.mensagem.imagemUrl);
+
 	const resposta = await client.beta.messages.toolRunner({
-		model: cfg.modelo,
-		max_tokens: 4096,
+		model: temImagem ? cfg.modeloVisao : cfg.modelo,
+		max_tokens: temImagem ? 16000 : 4096,
 		system: entrada.system,
 		tools: ferramentas,
 		messages: [{ role: "user", content: conteudo as never }],

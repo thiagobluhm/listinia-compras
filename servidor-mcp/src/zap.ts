@@ -20,8 +20,10 @@ interface ZapEnv extends ListiniaEnv {
 	/** Recurso do Microsoft Foundry que serve o modelo. */
 	FOUNDRY_RESOURCE: string;
 	FOUNDRY_API_KEY: string;
-	/** Deployment do Foundry. Trocar de modelo é trocar esta var. */
+	/** Deployment do Foundry para conversa. Trocar de modelo é trocar esta var. */
 	FOUNDRY_MODELO: string;
+	/** Deployment para turnos com imagem. Ver o porquê medido em zap/harness.ts. */
+	FOUNDRY_MODELO_VISAO: string;
 	/** Teto de turnos por pessoa por dia. Var do wrangler: ajustar sem deploy de código. */
 	LIMITE_TURNOS_DIA: string;
 	/** Browser Run, para abrir a página oficial da NFC-e. */
@@ -72,6 +74,7 @@ export default {
 							resource: env.FOUNDRY_RESOURCE,
 							apiKey: env.FOUNDRY_API_KEY,
 							modelo: env.FOUNDRY_MODELO,
+							modeloVisao: env.FOUNDRY_MODELO_VISAO || env.FOUNDRY_MODELO,
 							navegador: env.NAVEGADOR,
 						},
 						Number(env.LIMITE_TURNOS_DIA) || 30,

@@ -22,6 +22,7 @@
 	"vars": {
 		"FOUNDRY_RESOURCE": "fdrybluhm",
 		"FOUNDRY_MODELO": "claude-haiku-4-5",
+		"FOUNDRY_MODELO_VISAO": "claude-opus-5",
 		"LIMITE_TURNOS_DIA": "30"
 	},
 
