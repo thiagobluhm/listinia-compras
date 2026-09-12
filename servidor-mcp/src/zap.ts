@@ -24,6 +24,9 @@ interface ZapEnv extends ListiniaEnv {
 	FOUNDRY_MODELO: string;
 	/** Deployment para turnos com imagem. Ver o porquê medido em zap/harness.ts. */
 	FOUNDRY_MODELO_VISAO: string;
+	/** Os dois leitores da identidade da loja. Diferentes de proposito. */
+	FOUNDRY_WORKER_A: string;
+	FOUNDRY_WORKER_B: string;
 	/** Teto de turnos por pessoa por dia. Var do wrangler: ajustar sem deploy de código. */
 	LIMITE_TURNOS_DIA: string;
 	/** Browser Run, para abrir a página oficial da NFC-e. */
@@ -75,6 +78,8 @@ export default {
 							apiKey: env.FOUNDRY_API_KEY,
 							modelo: env.FOUNDRY_MODELO,
 							modeloVisao: env.FOUNDRY_MODELO_VISAO || env.FOUNDRY_MODELO,
+							modeloWorkerA: env.FOUNDRY_WORKER_A || "claude-haiku-4-5",
+							modeloWorkerB: env.FOUNDRY_WORKER_B || "claude-sonnet-5",
 							navegador: env.NAVEGADOR,
 						},
 						Number(env.LIMITE_TURNOS_DIA) || 30,

@@ -1,0 +1,234 @@
+/**
+ * Quem é a loja deste cupom — por acordo entre dois leitores, e não por fé.
+ *
+ * O PROBLEMA, medido e não suposto: a mesma foto do mesmo cupom, lida duas
+ * vezes pelo mesmo modelo, devolveu "Comata" numa passada e "Cometa" na outra.
+ * O papel diz Comata. Nenhuma das duas leituras se anuncia como duvidosa —
+ * "Cometa" é um nome perfeitamente plausível de mercado.
+ *
+ * Isso envenena o produto de um jeito silencioso: `mercado` é o campo pelo qual
+ * o histórico compara preço entre lojas. "Comata" e "Cometa" viram DOIS
+ * estabelecimentos, e a comparação que é o coração do produto simplesmente
+ * para de funcionar — sem erro, sem aviso, meses depois.
+ *
+ * A SAÍDA: dois workers leem a identidade de forma independente e um judge
+ * decide. A variância que causava o bug vira o DETECTOR dele — concordância é
+ * a inferência, divergência é o sinal de perguntar à pessoa. Das duas, uma:
+ * ou o sistema infere com segurança, ou ele pergunta. Nunca chuta.
+ *
+ * Modelos DIFERENTES de propósito: dois erros do mesmo modelo são
+ * correlacionados — ele tende a errar igual nas duas passadas, os dois
+ * concordam no erro e o judge aprova lixo. Modelos diferentes erram diferente.
+ *
+ * O judge é CÓDIGO no caso comum. Quando CNPJ e nome normalizado batem não há
+ * nada a julgar, e um modelo ali só somaria custo e uma chance de alucinar.
+ */
+
+import type { AnthropicFoundry } from "@anthropic-ai/foundry-sdk";
+import { normalizarNome, resolverEstabelecimento } from "../desempenho";
+
+export interface IdentidadeLoja {
+	/** 14 dígitos, já validados. Null quando ilegível ou com dígito verificador errado. */
+	cnpj: string | null;
+	nome: string | null;
+	cidade: string | null;
+	uf: string | null;
+}
+
+export interface VeredictoLoja {
+	/** 'acordo' = os dois leram igual. 'divergente' = tem que perguntar. */
+	status: "acordo" | "divergente" | "nada";
+	/** Só quando há acordo. */
+	identidade: IdentidadeLoja | null;
+	/** Id do estabelecimento já cadastrado, quando o nome ou apelido resolve. */
+	estabelecimentoId: string | null;
+	/** O que perguntar à pessoa, quando divergente. */
+	pergunta: string | null;
+	leituras: IdentidadeLoja[];
+}
+
+/**
+ * CNPJ com os dois dígitos verificadores conferidos.
+ *
+ * É isto que separa o CNPJ do nome: um dígito lido errado quebra a validação
+ * quase sempre, então o erro fica DETECTÁVEL. Com nome não há como saber.
+ */
+export function cnpjValido(valor: string): boolean {
+	const d = valor.replace(/\D/g, "");
+	if (d.length !== 14 || /^(\d)\1{13}$/.test(d)) return false;
+	const digito = (ate: number): number => {
+		// Percorrendo de trás para frente, o peso SEMPRE começa em 2 e sobe até 9,
+		// voltando a 2. Comecei isto em `ate - 7` e o validador reprovava CNPJ
+		// legítimo — inclusive o do cupom que serviu de teste, que é válido.
+		let peso = 2;
+		let soma = 0;
+		for (let i = ate - 1; i >= 0; i--) {
+			soma += Number(d[i]) * peso;
+			peso = peso === 9 ? 2 : peso + 1;
+		}
+		const r = soma % 11;
+		return r < 2 ? 0 : 11 - r;
+	};
+	return digito(12) === Number(d[12]) && digito(13) === Number(d[13]);
+}
+
+export const PROMPT_WORKER = `Você lê APENAS o cabeçalho de um cupom fiscal brasileiro e devolve quem é a loja.
+
+Responda SÓ com um objeto JSON, sem texto antes ou depois, neste formato:
+{"cnpj": "...", "nome": "...", "cidade": "...", "uf": ".."}
+
+Regras, sem exceção:
+- Copie o que está IMPRESSO. Não corrija nome que pareça estranho, não complete
+  abreviação, não troque por uma rede conhecida que se pareça.
+- Campo que você não conseguir ler com certeza: null. Nunca aproxime.
+- O cnpj vai só com dígitos, sem pontuação.
+- Não leia os itens da compra. Só o cabeçalho.`;
+
+/** Um worker: uma leitura independente do cabeçalho. */
+async function lerIdentidade(
+	client: AnthropicFoundry,
+	modelo: string,
+	imagemUrl: string,
+): Promise<IdentidadeLoja | null> {
+	try {
+		const r = await client.messages.create({
+			model: modelo,
+			max_tokens: 500,
+			system: PROMPT_WORKER,
+			messages: [
+				{
+					role: "user",
+					content: [
+						{ type: "image", source: { type: "url", url: imagemUrl } },
+						{ type: "text", text: "Quem é a loja deste cupom?" },
+					],
+				},
+			],
+		});
+		const texto = r.content
+			.filter((b) => b.type === "text")
+			.map((b) => b.text)
+			.join("");
+		// O modelo às vezes embrulha em cerca de código mesmo pedindo JSON puro.
+		const m = texto.match(/\{[\s\S]*\}/);
+		if (!m) return null;
+		const bruto = JSON.parse(m[0]) as Record<string, unknown>;
+		const cnpj = typeof bruto.cnpj === "string" ? bruto.cnpj.replace(/\D/g, "") : "";
+		const txt = (v: unknown): string | null =>
+			typeof v === "string" && v.trim() ? v.trim() : null;
+		return {
+			cnpj: cnpjValido(cnpj) ? cnpj : null,
+			nome: txt(bruto.nome),
+			cidade: txt(bruto.cidade),
+			uf: txt(bruto.uf),
+		};
+	} catch {
+		// Worker que cai não derruba o turno: o judge trata como leitura ausente.
+		return null;
+	}
+}
+
+/**
+ * O judge, em código. Só decide; nunca lê a imagem.
+ *
+ * Ordem de autoridade: CNPJ válido idêntico é acordo forte — dois modelos
+ * diferentes acertarem os mesmos 14 dígitos COM dígito verificador batendo não
+ * acontece por acaso. Sem CNPJ, sobra o nome normalizado, que é acordo fraco
+ * mas suficiente quando idêntico.
+ */
+export function julgar(a: IdentidadeLoja | null, b: IdentidadeLoja | null): VeredictoLoja {
+	const leituras = [a, b].filter((x): x is IdentidadeLoja => x !== null);
+	const base: VeredictoLoja = {
+		status: "nada",
+		identidade: null,
+		estabelecimentoId: null,
+		pergunta: null,
+		leituras,
+	};
+	if (leituras.length === 0) return base;
+
+	if (leituras.length === 1) {
+		// Um worker caiu. Uma leitura sozinha nunca é acordo — é justamente o
+		// cenário sem contraprova que este arquivo existe para não aceitar.
+		const so = leituras[0]!;
+		return {
+			...base,
+			status: "divergente",
+			pergunta: `Só consegui uma leitura do cabeçalho: ${so.nome ?? "loja sem nome legível"}. Confirma?`,
+		};
+	}
+
+	const [x, y] = leituras as [IdentidadeLoja, IdentidadeLoja];
+
+	if (x.cnpj && y.cnpj && x.cnpj === y.cnpj) {
+		// Dois modelos diferentes chegando aos mesmos 14 dígitos COM verificador
+		// batendo não é coincidência: a identidade está resolvida. O NOME, porém,
+		// não herda essa confiança — se eles divergiram nele, ele fica null e
+		// quem cuida disso é o apelido, não um palpite gravado como verdade.
+		const mesmoNome = normalizarNome(x.nome ?? "") === normalizarNome(y.nome ?? "");
+		return {
+			...base,
+			status: "acordo",
+			identidade: { ...x, nome: mesmoNome ? (x.nome ?? y.nome) : null },
+		};
+	}
+	if ((x.cnpj && !y.cnpj) || (y.cnpj && !x.cnpj)) {
+		// UM leu o CNPJ e o outro não leu NENHUM — ou seja, ninguém contradiz.
+		// Isso resolve a identidade, e a segunda confirmação não vem do outro
+		// modelo: vem dos dígitos verificadores. Um CNPJ que fecha os dois DV
+		// carrega a própria contraprova (errar dígitos e ainda passar é ~1%).
+		// Exigir que os DOIS leiam o número degeneraria para "pergunta sempre",
+		// que é exatamente o que este desenho existe para evitar.
+		const comCnpj = (x.cnpj ? x : y) as IdentidadeLoja;
+		const mesmoNome = normalizarNome(x.nome ?? "") === normalizarNome(y.nome ?? "");
+		return {
+			...base,
+			status: "acordo",
+			identidade: { ...comCnpj, nome: mesmoNome ? comCnpj.nome : null },
+		};
+	}
+	if (x.cnpj && y.cnpj && x.cnpj !== y.cnpj) {
+		return {
+			...base,
+			status: "divergente",
+			pergunta: "Li dois CNPJs diferentes no cupom. Me diz o nome do mercado, por favor?",
+		};
+	}
+
+	const nx = normalizarNome(x.nome ?? "");
+	const ny = normalizarNome(y.nome ?? "");
+	if (nx && nx === ny) {
+		return { ...base, status: "acordo", identidade: { ...x, cnpj: x.cnpj ?? y.cnpj } };
+	}
+	if (!nx && !ny) return base;
+
+	return {
+		...base,
+		status: "divergente",
+		pergunta: `Não tenho certeza do mercado: li "${x.nome ?? "?"}" e "${y.nome ?? "?"}". Qual é o certo?`,
+	};
+}
+
+/**
+ * O pipeline: dois workers, um judge, e a base de estabelecimentos no fim.
+ *
+ * Roda em paralelo porque as duas leituras são independentes por construção —
+ * fazer em série só somaria latência num turno que a pessoa está esperando.
+ */
+export async function resolverLoja(
+	client: AnthropicFoundry,
+	db: D1Database,
+	imagemUrl: string,
+	modeloA: string,
+	modeloB: string,
+): Promise<VeredictoLoja> {
+	const [a, b] = await Promise.all([
+		lerIdentidade(client, modeloA, imagemUrl),
+		lerIdentidade(client, modeloB, imagemUrl),
+	]);
+	const v = julgar(a, b);
+	if (v.status === "acordo" && v.identidade?.nome) {
+		v.estabelecimentoId = await resolverEstabelecimento(db, v.identidade.nome);
+	}
+	return v;
+}

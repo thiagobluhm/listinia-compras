@@ -22,6 +22,7 @@ import { betaTool } from "@anthropic-ai/sdk/helpers/beta/json-schema";
 import { abrirFerramentas, type FerramentaLLM } from "./ferramentas";
 import { buscarUsuarioPorTelefone, criarUsuario, ehAceite } from "./identidade";
 import { lerQrDoCupom } from "./cupom";
+import { resolverLoja } from "./estabelecimento";
 import { lerPaginaNfce } from "./nfce";
 import { registrarTurno } from "./uso";
 import type { MensagemRecebida } from "./zapi";
@@ -161,6 +162,9 @@ export interface ConfigModelo {
 	 * é economizar no ativo.
 	 */
 	modeloVisao: string;
+	/** Os dois workers que leem a identidade da loja. Modelos DIFERENTES de propósito. */
+	modeloWorkerA: string;
+	modeloWorkerB: string;
 	/** Binding do Browser Run, para abrir a página da NFC-e. */
 	navegador: Fetcher;
 }
@@ -184,7 +188,11 @@ export interface EntradaModelo {
  * nunca responder. 12 dá folga para uma nota fiscal inteira (ler, conferir,
  * gravar item a item) e ainda assim tem fim.
  */
-async function chamarModelo(entrada: EntradaModelo, cfg: ConfigModelo): Promise<string> {
+async function chamarModelo(
+	entrada: EntradaModelo,
+	cfg: ConfigModelo,
+	db: D1Database,
+): Promise<string> {
 	const client = new AnthropicFoundry({ resource: cfg.resource, apiKey: cfg.apiKey });
 
 	// As 10 ferramentas do MCP viram ferramentas do runner sem reescrever
@@ -225,6 +233,20 @@ async function chamarModelo(entrada: EntradaModelo, cfg: ConfigModelo): Promise<
 		);
 	}
 
+	// Quem é a loja: dois workers e um judge (zap/estabelecimento.ts). Roda antes
+	// do turno principal porque o resultado muda o que se pode afirmar — e quando
+	// o judge não fecha, o certo é PERGUNTAR, não deixar o modelo grande escolher
+	// um nome plausível.
+	const loja = entrada.mensagem.imagemUrl
+		? await resolverLoja(
+				client,
+				db,
+				entrada.mensagem.imagemUrl,
+				cfg.modeloWorkerA,
+				cfg.modeloWorkerB,
+			)
+		: null;
+
 	// A FOTO VAI SEMPRE, mesmo quando o QR foi lido.
 	//
 	// A versão anterior deste arquivo a omitia quando havia QR, para não tentar
@@ -247,6 +269,21 @@ async function chamarModelo(entrada: EntradaModelo, cfg: ConfigModelo): Promise<
 				"[Esta foto tem um QR de NFC-e. Chame 'cupom_ler' para os valores oficiais." +
 				(entrada.chave ? ` Chave de acesso: ${entrada.chave}.` : "") +
 				"]",
+		});
+	}
+	if (loja && loja.status !== "nada") {
+		const i = loja.identidade;
+		conteudo.push({
+			type: "text",
+			text:
+				loja.status === "acordo"
+					? `[Loja conferida por dupla leitura: CNPJ ${i?.cnpj ?? "não lido"}, ` +
+						`${i?.cidade ?? "?"}/${i?.uf ?? "?"}. ` +
+						(i?.nome
+							? `Nome: ${i.nome}.`
+							: "As duas leituras DISCORDARAM do nome — pergunte à pessoa como se chama esse mercado, e não escolha um por conta.") +
+						(loja.estabelecimentoId ? " Já está cadastrado." : "")
+					: `[Não consegui confirmar a loja. ${loja.pergunta}]`,
 		});
 	}
 	conteudo.push({ type: "text", text: entrada.mensagem.texto || "(mensagem sem texto)" });
@@ -328,6 +365,7 @@ export async function processarMensagem(
 				chave: leitura?.chave ?? null,
 			},
 			cfg,
+			db,
 		);
 	} finally {
 		await ferramentas.fechar();
