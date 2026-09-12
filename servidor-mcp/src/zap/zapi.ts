@@ -14,6 +14,16 @@ export interface MensagemRecebida {
 	texto: string;
 	/** URL da imagem, quando houver. O cupom fiscal chega por aqui. */
 	imagemUrl: string | null;
+	/**
+	 * A mensagem veio de um GRUPO.
+	 *
+	 * Precisa subir até o harness: em grupo a Z-API põe o ID do grupo no campo
+	 * `phone` (formato `1203...-group`), e o `normalizarE164` tira o sufixo e o
+	 * transforma num "telefone" plausível. Foi assim que dois grupos viraram
+	 * usuário em 12/09/2026. Enquanto despensa compartilhada não existir de
+	 * verdade, o harness recusa grupo — mas só consegue recusar se souber.
+	 */
+	deGrupo: boolean;
 }
 
 export interface ZapiConfig {
@@ -45,6 +55,7 @@ export async function receber(request: Request): Promise<MensagemRecebida | null
 		telefone,
 		texto: texto?.message ?? "",
 		imagemUrl: imagem?.imageUrl ?? null,
+		deGrupo: corpo.isGroup === true || telefone.includes("-group"),
 	};
 }
 

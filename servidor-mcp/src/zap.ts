@@ -22,6 +22,8 @@ interface ZapEnv extends ListiniaEnv {
 	FOUNDRY_API_KEY: string;
 	/** Deployment do Foundry. Trocar de modelo é trocar esta var. */
 	FOUNDRY_MODELO: string;
+	/** Teto de turnos por pessoa por dia. Var do wrangler: ajustar sem deploy de código. */
+	LIMITE_TURNOS_DIA: string;
 }
 
 export default {
@@ -61,11 +63,16 @@ export default {
 		ctx.waitUntil(
 			(async () => {
 				try {
-					const texto = await processarMensagem(env.DB, mensagem, {
-						resource: env.FOUNDRY_RESOURCE,
-						apiKey: env.FOUNDRY_API_KEY,
-						modelo: env.FOUNDRY_MODELO,
-					});
+					const texto = await processarMensagem(
+						env.DB,
+						mensagem,
+						{
+							resource: env.FOUNDRY_RESOURCE,
+							apiKey: env.FOUNDRY_API_KEY,
+							modelo: env.FOUNDRY_MODELO,
+						},
+						Number(env.LIMITE_TURNOS_DIA) || 30,
+					);
 					await responder(cfg, mensagem.telefone, texto);
 				} catch (e) {
 					// Só o nome do tipo: mensagens de erro de conexão carregam

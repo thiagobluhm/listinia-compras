@@ -20,8 +20,38 @@
 import { AnthropicFoundry } from "@anthropic-ai/foundry-sdk";
 import { betaTool } from "@anthropic-ai/sdk/helpers/beta/json-schema";
 import { abrirFerramentas, type FerramentaLLM } from "./ferramentas";
-import { resolverUsuarioPorTelefone } from "./identidade";
+import { buscarUsuarioPorTelefone, criarUsuario, ehAceite } from "./identidade";
+import { registrarTurno } from "./uso";
 import type { MensagemRecebida } from "./zapi";
+
+/**
+ * As três respostas que NÃO passam pelo modelo.
+ *
+ * Todas as três são casos em que gastar token seria errado, não só caro: grupo
+ * é recusa de escopo, convite é pedido de consentimento, teto é defesa de
+ * custo. Texto fixo também torna as três testáveis sem chave de provider.
+ */
+const TEXTO_GRUPO =
+	"Oi! Ainda não sei trabalhar em grupo — a despensa hoje é de uma pessoa só. " +
+	"Me chama no privado que eu te ajudo. 🙂";
+
+const TEXTO_CONVITE =
+	"Oi! Eu sou o Listinia, a despensa da casa no WhatsApp. 🏠\n\n" +
+	"Eu guardo o que tem em casa, leio a nota do mercado, aviso o que está " +
+	"acabando e comparo preço com o que você já pagou.\n\n" +
+	"Para isso eu preciso guardar o seu número e o que você me contar. " +
+	"Se estiver tudo bem, responde *SIM* que eu começo. " +
+	"Se não responder, nada é guardado.";
+
+const TEXTO_BOAS_VINDAS =
+	"Pronto, sua despensa está criada! 🎉\n\n" +
+	"Pode começar mandando a foto de uma nota fiscal, ou me dizendo o que já " +
+	"tem em casa (ex: \"arroz 5 kg, café 500 g\").\n\n" +
+	"Se quiser sair depois, é só pedir para apagar seus dados.";
+
+const TEXTO_TETO =
+	"Por hoje chegamos no limite de mensagens. 😅 Amanhã eu volto a responder " +
+	"normalmente — sua despensa continua guardadinha.";
 
 /**
  * A regra `jamais-inventar`, que nos plugins é carregada pelos 10 agentes.
@@ -138,13 +168,41 @@ async function chamarModelo(entrada: EntradaModelo, cfg: ConfigModelo): Promise<
 	return texto || "Comecei a mexer nisso mas não consegui fechar a resposta. Me manda de novo?";
 }
 
-/** Mensagem entra, texto de resposta sai. Quem manda pelo canal é o entrypoint. */
+/**
+ * Mensagem entra, texto de resposta sai. Quem manda pelo canal é o entrypoint.
+ *
+ * A ORDEM DOS PORTÕES É DE PROPÓSITO, e cada um existe por um incidente ou por
+ * um risco concreto:
+ *
+ * 1. grupo  — em 12/09/2026 dois grupos viraram "usuário" porque a Z-API põe o
+ *             ID do grupo no campo do telefone. Recusa até existir despensa
+ *             compartilhada de verdade.
+ * 2. aceite — no mesmo dia sete contatos foram cadastrados sem pedir nada, só
+ *             por mandarem mensagem. Telefone de terceiro é dado pessoal.
+ * 3. teto   — o número é público; sem limite, um contato hostil vira fatura.
+ *
+ * Os três recusam ANTES de abrir ferramenta ou chamar modelo. Isso não é só
+ * economia: significa que um estranho não consegue nos custar um centavo, e
+ * que o caso mais comum de abuso é o mais barato de atender.
+ */
 export async function processarMensagem(
 	db: D1Database,
 	mensagem: MensagemRecebida,
 	cfg: ConfigModelo,
+	limiteTurnosDia: number,
 ): Promise<string> {
-	const userId = await resolverUsuarioPorTelefone(db, mensagem.telefone);
+	if (mensagem.deGrupo) return TEXTO_GRUPO;
+
+	let userId = await buscarUsuarioPorTelefone(db, mensagem.telefone);
+	if (!userId) {
+		if (!ehAceite(mensagem.texto)) return TEXTO_CONVITE;
+		userId = await criarUsuario(db, mensagem.telefone);
+		return TEXTO_BOAS_VINDAS;
+	}
+
+	const turnos = await registrarTurno(db, userId, new Date().toISOString().slice(0, 10));
+	if (turnos > limiteTurnosDia) return TEXTO_TETO;
+
 	const ferramentas = await abrirFerramentas(db, userId);
 	try {
 		return await chamarModelo(
