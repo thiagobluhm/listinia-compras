@@ -6,8 +6,7 @@
  * Deploy: npm run deploy:zap
  *
  * Segredos (NUNCA no jsonc — `wrangler secret put -c wrangler.zap.jsonc`):
- *   ZAPI_INSTANCIA, ZAPI_TOKEN, ZAPI_CLIENT_TOKEN, ZAPI_WEBHOOK_SEGREDO
- * A chave do provider de LLM entra aqui quando o provider for escolhido.
+ *   ZAPI_INSTANCIA, ZAPI_TOKEN, ZAPI_CLIENT_TOKEN, ZAPI_WEBHOOK_SEGREDO, FOUNDRY_API_KEY
  */
 {
 	"$schema": "node_modules/wrangler/config-schema.json",
@@ -16,6 +15,14 @@
 	"compatibility_date": "2026-07-02",
 	"compatibility_flags": ["nodejs_compat"],
 	"observability": { "enabled": true },
+
+	// O Foundry serve Claude e GPT no mesmo recurso. O modelo fica aqui, e não
+	// no código, para que trocar opus-5 por sonnet-5 ou haiku-4-5 seja uma
+	// linha e um deploy de config — sem tocar no harness.
+	"vars": {
+		"FOUNDRY_RESOURCE": "fdrybluhm",
+		"FOUNDRY_MODELO": "claude-opus-5"
+	},
 
 	// Sem custom_domain enquanto for MVP de um número só: a URL workers.dev
 	// serve para apontar o webhook da Z-API. O domínio entra quando o produto

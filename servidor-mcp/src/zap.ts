@@ -17,6 +17,11 @@ interface ZapEnv extends ListiniaEnv {
 	ZAPI_CLIENT_TOKEN: string;
 	/** Segredo no path do webhook. Ver o comentário na rota. */
 	ZAPI_WEBHOOK_SEGREDO: string;
+	/** Recurso do Microsoft Foundry que serve o modelo. */
+	FOUNDRY_RESOURCE: string;
+	FOUNDRY_API_KEY: string;
+	/** Deployment do Foundry. Trocar de modelo é trocar esta var. */
+	FOUNDRY_MODELO: string;
 }
 
 export default {
@@ -56,7 +61,11 @@ export default {
 		ctx.waitUntil(
 			(async () => {
 				try {
-					const texto = await processarMensagem(env.DB, mensagem);
+					const texto = await processarMensagem(env.DB, mensagem, {
+						resource: env.FOUNDRY_RESOURCE,
+						apiKey: env.FOUNDRY_API_KEY,
+						modelo: env.FOUNDRY_MODELO,
+					});
 					await responder(cfg, mensagem.telefone, texto);
 				} catch (e) {
 					// Só o nome do tipo: mensagens de erro de conexão carregam

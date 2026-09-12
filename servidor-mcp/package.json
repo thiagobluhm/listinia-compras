@@ -20,6 +20,7 @@
 		"db:local": "wrangler d1 execute listinia --local --file=./schema.sql"
 	},
 	"dependencies": {
+		"@anthropic-ai/foundry-sdk": "^0.4.6",
 		"@cloudflare/workers-oauth-provider": "^0.10.3",
 		"@modelcontextprotocol/sdk": "1.30.0",
 		"@modelcontextprotocol/server": "2.0.0",
