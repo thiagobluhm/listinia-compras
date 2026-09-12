@@ -26,6 +26,15 @@ const MAX_PIXELS = 40_000_000;
 export interface LeituraCupom {
 	/** URL da NFC-e, quando o QR trouxe uma. */
 	urlNfce: string | null;
+	/**
+	 * A chave de acesso, 44 dígitos, extraída da URL.
+	 *
+	 * Vale por si só, mesmo quando a página da Receita não abre: ela é a
+	 * IDENTIDADE da nota. Gravada junto com os valores lidos da foto, ela
+	 * permite reprocessar a nota depois pela fonte oficial, e o UNIQUE em
+	 * `notas.chave` impede que a mesma compra entre duas vezes.
+	 */
+	chave: string | null;
 	/** O que o QR continha, quando não era uma URL utilizável. */
 	conteudoBruto: string | null;
 	/** Por que não deu, em linguagem de quem vai ler no WhatsApp. */
@@ -44,6 +53,24 @@ export interface LeituraCupom {
  * NUNCA montamos a URL a partir da chave. Isso é proibido na spec do leitor
  * visual, e com razão: URL montada à mão é palpite com cara de endereço.
  */
+/**
+ * A chave de acesso dentro da URL do QR.
+ *
+ * O parâmetro `p` da NFC-e vem com campos separados por `|`, e o primeiro é a
+ * chave. Só aceita 44 dígitos — o que não tiver esse formato não é chave, e
+ * meia chave é pior que nenhuma.
+ */
+function extrairChave(url: string): string | null {
+	try {
+		const u = new URL(url);
+		const p = u.searchParams.get("p") ?? u.searchParams.get("chNFe") ?? "";
+		const primeiro = p.split("|")[0]?.replace(/\D/g, "") ?? "";
+		return /^\d{44}$/.test(primeiro) ? primeiro : null;
+	} catch {
+		return null;
+	}
+}
+
 function pareceNfce(texto: string): boolean {
 	let u: URL;
 	try {
@@ -65,7 +92,12 @@ function pareceNfce(texto: string): boolean {
  * caminho pior esconde do resto do sistema que o caminho bom falhou.
  */
 export async function lerQrDoCupom(imagemUrl: string): Promise<LeituraCupom> {
-	const vazio = (motivo: string): LeituraCupom => ({ urlNfce: null, conteudoBruto: null, motivo });
+	const vazio = (motivo: string): LeituraCupom => ({
+		urlNfce: null,
+		chave: null,
+		conteudoBruto: null,
+		motivo,
+	});
 
 	let bytes: Uint8Array;
 	try {
@@ -87,7 +119,12 @@ export async function lerQrDoCupom(imagemUrl: string): Promise<LeituraCupom> {
  * sem URL pública e sem depender da Z-API estar de pé.
  */
 export function decodificarQr(bytes: Uint8Array): LeituraCupom {
-	const vazio = (motivo: string): LeituraCupom => ({ urlNfce: null, conteudoBruto: null, motivo });
+	const vazio = (motivo: string): LeituraCupom => ({
+		urlNfce: null,
+		chave: null,
+		conteudoBruto: null,
+		motivo,
+	});
 
 	let pixels: { data: Uint8Array; width: number; height: number };
 	try {
@@ -103,7 +140,17 @@ export function decodificarQr(bytes: Uint8Array): LeituraCupom {
 	if (!achado) return vazio("não encontrei um QR code legível");
 
 	if (!pareceNfce(achado.data)) {
-		return { urlNfce: null, conteudoBruto: achado.data, motivo: "o QR não é de uma nota fiscal" };
+		return {
+			urlNfce: null,
+			chave: null,
+			conteudoBruto: achado.data,
+			motivo: "o QR não é de uma nota fiscal",
+		};
 	}
-	return { urlNfce: achado.data, conteudoBruto: achado.data, motivo: null };
+	return {
+		urlNfce: achado.data,
+		chave: extrairChave(achado.data),
+		conteudoBruto: achado.data,
+		motivo: null,
+	};
 }

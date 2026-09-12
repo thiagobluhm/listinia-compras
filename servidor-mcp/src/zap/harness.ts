@@ -59,7 +59,7 @@ const TEXTO_TETO =
  * A regra `jamais-inventar`, que nos plugins é carregada pelos 10 agentes.
  *
  * No WhatsApp não existem agentes — existe este system prompt e mais nada. Se
- * ele sair daqui, o produto vira "só a URL": `nota_registrar` e
+ * ele sair daqui, o produto vira "só a URL": "nota_registrar" e
  * `produto_salvar` gravam igual, sem trava, e a pessoa do zap não tem como
  * saber que há um modelo adivinhando preço. O texto completo e o porquê estão
  * em plugins/listinia-compras/references/jamais-inventar.md e em PLUGINS.md:115.
@@ -91,9 +91,18 @@ No lugar disso:
 Sempre diga o que ficou de fora antes de gravar qualquer coisa. Nada entra na
 despensa com um buraco silencioso.
 
-FOTO DE CUPOM — quando a nota chega por imagem e NÃO por QR.
-Isto é exceção, não o caminho normal. Quando o QR é lido, os itens vêm da
-Receita e não há nada para você interpretar.
+NOTA FISCAL — duas fontes, e a ordem entre elas não se negocia.
+1. Se veio QR, chame "cupom_ler" PRIMEIRO. O que ela devolver é a Receita
+   falando: esses valores VENCEM a foto, sempre, mesmo que a imagem pareça
+   dizer outra coisa.
+2. Se a "cupom_ler" falhar (a SEFAZ do estado sai do ar com frequência), aí
+   sim leia a foto — e diga à pessoa que os valores vieram da imagem e não da
+   Receita, porque a diferença importa para ela.
+3. Tendo a chave de acesso, passe-a SEMPRE no "nota_registrar", mesmo quando
+   os valores vieram da foto. Ela identifica a nota, impede registro em
+   duplicidade e permite buscar a versão oficial depois.
+
+FOTO DE CUPOM — lendo os valores da imagem.
 - Olhe a foto UMA VEZ, inteira, como ela está. Não peça recorte, não peça
   outra luz, não tente de novo por outro ângulo.
 - Ficar decifrando cupom desbotado não é persistência: é o caminho curto para
@@ -127,6 +136,8 @@ export interface EntradaModelo {
 	chamar(nome: string, argumentos: Record<string, unknown>): Promise<string>;
 	/** URL da NFC-e lida do QR da foto, quando houve. Decide o caminho do turno. */
 	urlNfce: string | null;
+	/** Chave de acesso da nota. Vale mesmo se a página da Receita não abrir. */
+	chave: string | null;
 }
 
 /**
@@ -178,21 +189,29 @@ async function chamarModelo(entrada: EntradaModelo, cfg: ConfigModelo): Promise<
 		);
 	}
 
-	// DOIS CAMINHOS, e a escolha já foi feita antes de chegar aqui.
+	// A FOTO VAI SEMPRE, mesmo quando o QR foi lido.
 	//
-	// Com QR: a imagem NÃO é enviada. Mandar a foto junto convidaria o modelo a
-	// conferir número na imagem, que é exatamente o que este desenho evita — e
-	// ainda custaria os tokens de visão à toa.
+	// A versão anterior deste arquivo a omitia quando havia QR, para não tentar
+	// o modelo a conferir número na imagem. Estava errado: a SEFAZ de um estado
+	// sai do ar (o CE estava fora no dia em que isto foi escrito), e nesse caso
+	// o turno ficava sem a fonte oficial E sem a foto — jogando fora a única
+	// informação que já estava na mão. A precedência entre as duas fontes é
+	// garantida pelo system prompt, não pela ausência da imagem.
 	//
-	// Sem QR: a foto vai, e valem as regras de foto de cupom do system prompt.
+	// A chave viaja junto ainda que a página não abra: ela é a identidade da
+	// nota, e gravá-la agora é o que permite reprocessar pela Receita depois.
 	const conteudo: Array<Record<string, unknown>> = [];
+	if (entrada.mensagem.imagemUrl) {
+		conteudo.push({ type: "image", source: { type: "url", url: entrada.mensagem.imagemUrl } });
+	}
 	if (entrada.urlNfce) {
 		conteudo.push({
 			type: "text",
-			text: "[A foto traz um cupom com QR code de NFC-e. Chame `cupom_ler` para pegar os itens oficiais na Receita — não tente adivinhar valores.]",
+			text:
+				"[Esta foto tem um QR de NFC-e. Chame 'cupom_ler' para os valores oficiais." +
+				(entrada.chave ? ` Chave de acesso: ${entrada.chave}.` : "") +
+				"]",
 		});
-	} else if (entrada.mensagem.imagemUrl) {
-		conteudo.push({ type: "image", source: { type: "url", url: entrada.mensagem.imagemUrl } });
 	}
 	conteudo.push({ type: "text", text: entrada.mensagem.texto || "(mensagem sem texto)" });
 
@@ -266,6 +285,7 @@ export async function processarMensagem(
 				mensagem,
 				chamar: ferramentas.chamar,
 				urlNfce: leitura?.urlNfce ?? null,
+				chave: leitura?.chave ?? null,
 			},
 			cfg,
 		);
