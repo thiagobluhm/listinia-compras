@@ -471,4 +471,42 @@ export function registrarToolsDespensa(server: McpServer, db: D1Database, userId
 			return texto({ ok: true, nota_id });
 		},
 	);
+
+	server.registerTool(
+		"nota_mercado_corrigir",
+		{
+			title: "Corrigir o nome do mercado da última nota",
+			annotations: {
+				readOnlyHint: false,
+				destructiveHint: false,
+				idempotentHint: true,
+				openWorldHint: false,
+			},
+			description:
+				"Troca o nome do mercado da nota MAIS RECENTE da pessoa. Use quando ela corrigir o nome depois que a compra já foi registrada — a fala dela vence qualquer leitura de foto.",
+			inputSchema: z.object({ mercado: z.string().min(1) }),
+		},
+		async ({ mercado }) => {
+			// Sempre a mais recente, e sem `nota_id` de propósito. O id existe, mas
+			// só aparece no RESULTADO da ferramenta anterior — e resultado de
+			// ferramenta não entra no histórico da conversa, só o texto final entra.
+			// Pedir um id que o turno seguinte não tem de onde tirar seria convidar
+			// o modelo a inventar um número, que é o defeito que esta ferramenta
+			// existe para consertar.
+			const ultima = await db
+				.prepare("SELECT id FROM notas WHERE user_id = ? ORDER BY id DESC LIMIT 1")
+				.bind(userId)
+				.first<{ id: number }>();
+			if (!ultima) return erro("não há nota registrada para corrigir");
+
+			await db
+				.prepare(
+					"UPDATE notas SET mercado = ?, estabelecimento_id = ? WHERE id = ? AND user_id = ?",
+				)
+				.bind(mercado, await resolverEstabelecimento(db, mercado), ultima.id, userId)
+				.run();
+
+			return texto({ ok: true, nota_id: ultima.id, mercado });
+		},
+	);
 }
