@@ -23,6 +23,7 @@ import { abrirFerramentas, type FerramentaLLM } from "./ferramentas";
 import { buscarUsuarioPorTelefone, criarUsuario, ehAceite } from "./identidade";
 import { lerQrDoCupom } from "./cupom";
 import { resolverLoja, type FonteImagem, type TipoImagem } from "./estabelecimento";
+import { triarImagem } from "./triagem";
 import { carregarConversa, gravarTurno, type FalaGravada } from "./conversa";
 import { lerPaginaNfce } from "./nfce";
 import { registrarTurno } from "./uso";
@@ -56,6 +57,26 @@ const TEXTO_BOAS_VINDAS =
 const TEXTO_TETO =
 	"Por hoje chegamos no limite de mensagens. 😅 Amanhã eu volto a responder " +
 	"normalmente — sua despensa continua guardadinha.";
+
+/**
+ * A resposta para imagem que não é cupom.
+ *
+ * Texto fixo em vez de mais uma ida ao modelo, de propósito: o turno já sabe
+ * tudo o que precisa saber, e mandar a figura ao modelo caro só para ele dizer
+ * "isso não é uma nota" é gastar o caro para produzir o óbvio.
+ *
+ * O pedido segue o discurso do produto: o padrão é a foto do cupom ou o QR, e
+ * digitar também vale. Nunca uma lista de campos para preencher.
+ */
+function textoNaoEhCupom(oQueE: string | null): string {
+	const viu = oQueE ? ` Aqui chegou ${oQueE.toLowerCase()}.` : "";
+	return (
+		`Essa imagem não é um cupom fiscal, então não tem o que eu ler nela.${viu}\n\n` +
+		"Manda a foto do cupom da compra — de preferência o rodapé inteiro, com o " +
+		"QR todo dentro do quadro. Se preferir, pode me dizer os itens digitando " +
+		"que a gente dá um jeito."
+	);
+}
 
 /**
  * A regra `jamais-inventar`, que nos plugins é carregada pelos 10 agentes.
@@ -413,13 +434,25 @@ async function chamarModelo(
 		: null;
 	const t1 = Date.now();
 
+	// O PORTÃO: isso é mesmo um cupom? Vem ANTES do júri da loja e do turno de
+	// visão porque os dois já assumem que há nota na imagem. Em 13/09/2026 um
+	// CHECK VERDE atravessou os dois e o produto disse "capturei sua nota".
+	// Ver o estrago inteiro, e por que ele falha para o lado de deixar passar,
+	// no cabeçalho de zap/triagem.ts.
+	const triagem = imagem ? await triarImagem(client, cfg.modelo, imagem) : null;
+	const t2 = Date.now();
+	if (triagem && !triagem.ehCupom) {
+		console.log(`triagem: RECUSADA (${triagem.oQueE ?? "sem descrição"})`);
+		return textoNaoEhCupom(triagem.oQueE);
+	}
+
 	const loja = imagem
 		? await resolverLoja(client, db, imagem, cfg.modeloWorkerA, cfg.modeloWorkerB)
 		: null;
-	const t2 = Date.now();
+	const t3 = Date.now();
 	if (entrada.mensagem.imagemUrl) {
 		console.log(
-			`tempos: baixar=${t1 - t0}ms loja=${t2 - t1}ms bytes=${imagem ? imagem.data.length : 0}`,
+			`tempos: baixar=${t1 - t0}ms triagem=${t2 - t1}ms loja=${t3 - t2}ms bytes=${imagem ? imagem.data.length : 0}`,
 		);
 	}
 
@@ -565,8 +598,10 @@ export async function processarMensagem(
 	const jaDitas: string[] = [];
 	if (mensagem.imagemUrl && avisar) {
 		const frase =
-			(await narrar(cfg, "recebi a foto da nota e comecei a olhar.")) ??
-			"Recebi sua nota 📸 já tô olhando.";
+			// "a foto", nunca "a nota": neste ponto ninguém olhou a imagem ainda,
+			// e chamar de nota o que pode ser um check verde é afirmar sem ver.
+			(await narrar(cfg, "recebi a foto e comecei a olhar.")) ??
+			"Recebi sua foto 📸 já tô olhando.";
 		jaDitas.push(frase);
 		await avisar(frase).catch(() => {});
 	}
