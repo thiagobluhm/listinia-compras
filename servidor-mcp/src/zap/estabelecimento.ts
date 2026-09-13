@@ -86,11 +86,29 @@ Regras, sem exceção:
 - O cnpj vai só com dígitos, sem pontuação.
 - Não leia os itens da compra. Só o cabeçalho.`;
 
+/**
+ * A imagem já em BYTES, do jeito que a Messages API aceita.
+ *
+ * Não se manda a URL. Quem baixaria a foto seria o servidor do modelo, e ele
+ * respeita o `robots.txt` do host — o host de mídia da Z-API proíbe robôs, e
+ * por causa disso todo turno com foto morria com
+ * `400 "This URL is disallowed by the website's robots.txt file."`
+ * (medido em produção em 12/09/2026, no primeiro teste real com nota).
+ * Quem baixa é o Worker, que não é robô de ninguém.
+ */
+export type TipoImagem = "image/jpeg" | "image/png" | "image/gif" | "image/webp";
+
+export interface FonteImagem {
+	type: "base64";
+	media_type: TipoImagem;
+	data: string;
+}
+
 /** Um worker: uma leitura independente do cabeçalho. */
 async function lerIdentidade(
 	client: AnthropicFoundry,
 	modelo: string,
-	imagemUrl: string,
+	imagem: FonteImagem,
 ): Promise<IdentidadeLoja | null> {
 	try {
 		const r = await client.messages.create({
@@ -101,7 +119,7 @@ async function lerIdentidade(
 				{
 					role: "user",
 					content: [
-						{ type: "image", source: { type: "url", url: imagemUrl } },
+						{ type: "image", source: imagem },
 						{ type: "text", text: "Quem é a loja deste cupom?" },
 					],
 				},
@@ -253,13 +271,13 @@ export function julgar(a: IdentidadeLoja | null, b: IdentidadeLoja | null): Vere
 export async function resolverLoja(
 	client: AnthropicFoundry,
 	db: D1Database,
-	imagemUrl: string,
+	imagem: FonteImagem,
 	modeloA: string,
 	modeloB: string,
 ): Promise<VeredictoLoja> {
 	const [a, b] = await Promise.all([
-		lerIdentidade(client, modeloA, imagemUrl),
-		lerIdentidade(client, modeloB, imagemUrl),
+		lerIdentidade(client, modeloA, imagem),
+		lerIdentidade(client, modeloB, imagem),
 	]);
 	const v = julgar(a, b);
 	if (v.status === "acordo" && v.identidade?.nome) {

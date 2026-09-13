@@ -15,9 +15,26 @@
  * pessoal; ele só entra no banco depois de um "sim".
  */
 
-/** Só dígitos. A Z-API manda '5511999998888'; um '+' ou traço não pode virar outro usuário. */
+/**
+ * Só dígitos, e o NONO DÍGITO canonizado. Um '+' ou traço não pode virar outro
+ * usuário — e a falta do 9 também não.
+ *
+ * Medido no primeiro contato real (12/09/2026): a Z-API entregou
+ * '558598281228', doze dígitos, sendo o número '+55 85 9 9828-1228'. O JID do
+ * WhatsApp no Brasil não é estável quanto ao nono dígito: a mesma pessoa
+ * aparece com ele e sem ele. Como `provedor_sub` é a chave de identidade
+ * (UNIQUE (provedor, provedor_sub)), as duas grafias virariam DUAS despensas, e
+ * o histórico de preço pago — o único dado deste produto que não se copia — se
+ * partiria em silêncio, que é o pior jeito de quebrar.
+ *
+ * Canonizamos sempre para a forma COM o 9, que é o número que a pessoa
+ * reconhece. Só mexemos no caso inequívoco: celular brasileiro na forma antiga
+ * de oito dígitos, que começa em 6-9. Fixo começa em 2-5 e não ganha nada.
+ */
 function normalizarE164(telefone: string): string {
-	return telefone.replace(/\D/g, "");
+	const digitos = telefone.replace(/\D/g, "");
+	const celularAntigo = digitos.match(/^55(\d{2})([6-9]\d{7})$/);
+	return celularAntigo ? `55${celularAntigo[1]}9${celularAntigo[2]}` : digitos;
 }
 
 /**

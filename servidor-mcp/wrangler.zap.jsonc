@@ -25,7 +25,9 @@
 		"FOUNDRY_MODELO_VISAO": "claude-opus-5",
 		"FOUNDRY_WORKER_A": "claude-haiku-4-5",
 		"FOUNDRY_WORKER_B": "claude-sonnet-5",
-		"LIMITE_TURNOS_DIA": "30"
+		"LIMITE_TURNOS_DIA": "30",
+		// Narração do andamento em turno com foto. "0" cala o narrador sem deploy.
+		"NARRADOR": "1"
 	},
 
 	// Sem custom_domain enquanto for MVP de um número só: a URL workers.dev
@@ -43,5 +45,31 @@
 			"database_name": "listinia",
 			"database_id": "352349d4-ff27-4322-b605-14a9a32ed842"
 		}
-	]
+	],
+
+	// O TURNO NAO CABE NO WEBHOOK, e nao cabia no `waitUntil` tambem.
+	//
+	// Medido em 12/09/2026 com nota real: baixar a foto custa 0,3 s e os dois
+	// leitores da loja 3,7 s, mas o turno do modelo de visao — ler 22 itens e
+	// gravar item a item — passa MINUTOS. A Cloudflare cancela o `waitUntil`
+	// muito antes disso, e a pessoa nao recebia resposta nenhuma. Cortar etapa
+	// nao resolveria: as etapas baratas somam 4 s de um problema de minutos.
+	//
+	// Entao o webhook so ENFILEIRA e responde na hora (a Z-API reentrega se
+	// demorarmos), e o consumidor processa com o tempo de sobra que a fila da.
+	// Um por vez em cada invocacao, para uma nota lenta nao segurar a fila de
+	// outra pessoa.
+	"queues": {
+		"producers": [{ "queue": "listinia-zap-turnos", "binding": "FILA" }],
+		"consumers": [
+			{
+				"queue": "listinia-zap-turnos",
+				"max_batch_size": 1,
+				"max_concurrency": 5,
+				// O `catch` do handler ja responde a pessoa e nao relanca, entao
+				// retry aqui so pegaria falha de infraestrutura.
+				"max_retries": 2
+			}
+		]
+	}
 }

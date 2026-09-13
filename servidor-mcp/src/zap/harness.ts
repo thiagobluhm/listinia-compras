@@ -22,7 +22,7 @@ import { betaTool } from "@anthropic-ai/sdk/helpers/beta/json-schema";
 import { abrirFerramentas, type FerramentaLLM } from "./ferramentas";
 import { buscarUsuarioPorTelefone, criarUsuario, ehAceite } from "./identidade";
 import { lerQrDoCupom } from "./cupom";
-import { resolverLoja } from "./estabelecimento";
+import { resolverLoja, type FonteImagem, type TipoImagem } from "./estabelecimento";
 import { lerPaginaNfce } from "./nfce";
 import { registrarTurno } from "./uso";
 import type { MensagemRecebida } from "./zapi";
@@ -167,6 +167,8 @@ export interface ConfigModelo {
 	modeloWorkerB: string;
 	/** Binding do Browser Run, para abrir a página da NFC-e. */
 	navegador: Fetcher;
+	/** Narrar o andamento do turno com foto. Var do wrangler: desligar sem deploy. */
+	narrador: boolean;
 }
 
 export interface EntradaModelo {
@@ -178,6 +180,150 @@ export interface EntradaModelo {
 	urlNfce: string | null;
 	/** Chave de acesso da nota. Vale mesmo se a página da Receita não abrir. */
 	chave: string | null;
+	/** Manda recado no meio do turno. `null` quando ninguém quer ser avisado. */
+	avisar: Avisar | null;
+	/** Falas já ditas neste turno, para o narrador não se repetir. */
+	jaDitas: string[];
+}
+
+/** Manda um recado no meio do turno, antes da resposta final. */
+export type Avisar = (texto: string) => Promise<void>;
+
+/** Teto de espera do narrador. Ele é enfeite: não pode atrasar o turno de verdade. */
+const NARRADOR_TIMEOUT_MS = 4000;
+
+const NARRADOR_PERSONA =
+	"Você é o Listinia falando no WhatsApp com alguém que acabou de mandar a foto de uma " +
+	"nota fiscal, e está avisando essa pessoa do que já andou. Escreva APENAS a fala.\n" +
+	"\n" +
+	"COMO ESCREVER:\n" +
+	"- UMA frase curta, no máximo ~20 palavras. Informal, de conversa de zap. No máximo um emoji.\n" +
+	"- Fale do que JÁ aconteceu, que é o que está no fato. Nunca prometa prazo ('já já', " +
+	"'em instantes', 'em segundos') nem diga o que vem depois.\n" +
+	"- PROIBIDO acrescentar qualquer informação que não esteja no fato: nada de número, preço, " +
+	"quantidade de itens, nome de loja, data ou marca que o fato não trouxe. Mesmo que você " +
+	"ache que sabe, aqui não sai — quem responde é a mensagem final, não você.\n" +
+	"- PROIBIDO jargão de máquina: não fale em base64, worker, fila, token, banco de dados, " +
+	"modelo, API, decodificar.\n" +
+	"- Varie o começo. Não abra com 'Confirmando', 'Estou' nem 'Já estou'.\n" +
+	"- Sem aspas em volta, sem traço nem marcador no começo.";
+
+/** Uma linha, sem marcador, dentro do tamanho. Fora disso, não vale. */
+function limparNarracao(bruto: string): string | null {
+	let t = bruto.trim().replace(/^["'“”]+|["'“”]+$/g, "");
+	t = t.split("\n")[0].trim();
+	t = t.replace(/^[-*•\d.)\s]+/, "").trim();
+	if (t.length < 4 || t.length > 200) return null;
+	return t;
+}
+
+/** Jaccard de palavras. Backstop determinístico contra o modelo repetir a fala anterior. */
+function pareceRepetido(a: string, b: string): boolean {
+	const pal = (s: string) => new Set(s.toLowerCase().match(/\p{L}+/gu) ?? []);
+	const x = pal(a);
+	const y = pal(b);
+	if (!x.size || !y.size) return false;
+	let comuns = 0;
+	for (const p of x) if (y.has(p)) comuns++;
+	return comuns / (x.size + y.size - comuns) >= 0.6;
+}
+
+/**
+ * Diz, em voz de gente, um fato que o CÓDIGO apurou.
+ *
+ * O fato chega pronto daqui de dentro; o modelo só escolhe as palavras. Narrar
+ * progresso inventado, num produto cuja regra número um é `jamais-inventar`,
+ * estragaria justamente o que o torna confiável.
+ *
+ * FAIL-OPEN: erro, demora ou fala repetida devolvem `null`, e quem chamou
+ * decide entre um texto fixo e o silêncio. Enfeite nunca derruba turno.
+ */
+async function narrar(
+	cfg: ConfigModelo,
+	fato: string,
+	jaDitas: readonly string[] = [],
+): Promise<string | null> {
+	if (!cfg.narrador) return null;
+	try {
+		const client = new AnthropicFoundry({ resource: cfg.resource, apiKey: cfg.apiKey });
+		const r = await client.messages.create(
+			{
+				model: cfg.modelo,
+				max_tokens: 80,
+				temperature: 0.8,
+				system: NARRADOR_PERSONA,
+				messages: [
+					{
+						role: "user",
+						content:
+							`FATO: ${fato}` +
+							(jaDitas.length
+								? `\n\nVOCÊ JÁ DISSE, nesta mesma conversa: ${jaDitas.map((f) => `"${f}"`).join(" ")}\n` +
+									"Escreva de um jeito claramente diferente: outro começo, outro verbo."
+								: ""),
+					},
+				],
+			},
+			{ timeout: NARRADOR_TIMEOUT_MS },
+		);
+		const bruto = r.content
+			.filter((b) => b.type === "text")
+			.map((b) => b.text)
+			.join("");
+		const frase = limparNarracao(bruto);
+		if (!frase) return null;
+		if (jaDitas.some((f) => pareceRepetido(frase, f))) return null;
+		return frase;
+	} catch {
+		return null;
+	}
+}
+
+/** Os únicos tipos que a Messages API aceita como imagem. */
+const TIPOS_IMAGEM: readonly TipoImagem[] = [
+	"image/jpeg",
+	"image/png",
+	"image/gif",
+	"image/webp",
+];
+
+/**
+ * Bytes -> base64, em blocos.
+ *
+ * `String.fromCharCode(...bytes)` de uma vez só estoura a pilha numa foto de
+ * celular: são centenas de milhares de argumentos numa chamada.
+ */
+function paraBase64(bytes: Uint8Array): string {
+	let binario = "";
+	const bloco = 0x8000;
+	for (let i = 0; i < bytes.length; i += bloco) {
+		binario += String.fromCharCode(...bytes.subarray(i, i + bloco));
+	}
+	return btoa(binario);
+}
+
+/**
+ * Baixa a foto UMA vez, para os dois workers da loja e para o turno principal.
+ *
+ * Devolve `null` em vez de estourar: foto que não baixa vira um pedido educado
+ * de reenvio, e não um turno morto com "tive um problema aqui".
+ */
+async function baixarImagem(url: string): Promise<FonteImagem | null> {
+	try {
+		const r = await fetch(url);
+		if (!r.ok) return null;
+		const bytes = new Uint8Array(await r.arrayBuffer());
+		const tipo = r.headers.get("content-type")?.split(";")[0]?.trim() ?? "";
+		return {
+			type: "base64",
+			// A Z-API às vezes manda `application/octet-stream`; JPEG é o que o
+			// WhatsApp entrega na prática, e é o palpite certo quando não há tipo.
+			media_type: TIPOS_IMAGEM.find((t) => t === tipo) ?? "image/jpeg",
+			data: paraBase64(bytes),
+		};
+	} catch {
+		return null;
+	}
 }
 
 /**
@@ -237,15 +383,45 @@ async function chamarModelo(
 	// do turno principal porque o resultado muda o que se pode afirmar — e quando
 	// o judge não fecha, o certo é PERGUNTAR, não deixar o modelo grande escolher
 	// um nome plausível.
-	const loja = entrada.mensagem.imagemUrl
-		? await resolverLoja(
-				client,
-				db,
-				entrada.mensagem.imagemUrl,
-				cfg.modeloWorkerA,
-				cfg.modeloWorkerB,
-			)
+	// Cronometragem das três etapas caras. O turno roda em `waitUntil` e a
+	// Cloudflare o cancela se demorar — em 12/09/2026 o turno com foto foi
+	// cancelado sem dizer ONDE tinha gasto o tempo. Sem isto aqui, a escolha
+	// entre cortar etapa e mudar de arquitetura seria palpite.
+	const t0 = Date.now();
+	const imagem = entrada.mensagem.imagemUrl
+		? await baixarImagem(entrada.mensagem.imagemUrl)
 		: null;
+	const t1 = Date.now();
+
+	const loja = imagem
+		? await resolverLoja(client, db, imagem, cfg.modeloWorkerA, cfg.modeloWorkerB)
+		: null;
+	const t2 = Date.now();
+	if (entrada.mensagem.imagemUrl) {
+		console.log(
+			`tempos: baixar=${t1 - t0}ms loja=${t2 - t1}ms bytes=${imagem ? imagem.data.length : 0}`,
+		);
+	}
+
+	// Segundo sinal de vida, e o único que tem conteúdo: aqui o código JÁ SABE
+	// se o QR abriu e quem é a loja. Nada disto é palpite — se não soubermos,
+	// o fato diz que não sabemos, e é isso que a pessoa ouve.
+	if (entrada.avisar && imagem) {
+		const fatos: string[] = [
+			entrada.chave
+				? "o QR da nota foi lido e a nota está identificada"
+				: "não deu para ler o QR nessa foto, então os valores vão sair da própria imagem",
+		];
+		if (loja?.status === "acordo" && loja.identidade?.nome) {
+			fatos.push(`a loja é ${loja.identidade.nome}`);
+		}
+		fatos.push("agora estou lendo os itens um por um");
+		const frase = await narrar(cfg, fatos.join("; ") + ".", entrada.jaDitas);
+		if (frase) {
+			entrada.jaDitas.push(frase);
+			await entrada.avisar(frase).catch(() => {});
+		}
+	}
 
 	// A FOTO VAI SEMPRE, mesmo quando o QR foi lido.
 	//
@@ -259,8 +435,13 @@ async function chamarModelo(
 	// A chave viaja junto ainda que a página não abra: ela é a identidade da
 	// nota, e gravá-la agora é o que permite reprocessar pela Receita depois.
 	const conteudo: Array<Record<string, unknown>> = [];
-	if (entrada.mensagem.imagemUrl) {
-		conteudo.push({ type: "image", source: { type: "url", url: entrada.mensagem.imagemUrl } });
+	if (imagem) {
+		conteudo.push({ type: "image", source: imagem });
+	} else if (entrada.mensagem.imagemUrl) {
+		conteudo.push({
+			type: "text",
+			text: "[A pessoa mandou uma foto, mas eu não consegui baixá-la. Peça para reenviar.]",
+		});
 	}
 	if (entrada.urlNfce) {
 		conteudo.push({
@@ -290,7 +471,7 @@ async function chamarModelo(
 
 	// Foto no turno -> modelo de visão, e mais espaço: uma nota de 22 itens vira
 	// uma chamada de ferramenta longa, e truncar no meio perde itens em silêncio.
-	const temImagem = Boolean(entrada.mensagem.imagemUrl);
+	const temImagem = Boolean(imagem);
 
 	const resposta = await client.beta.messages.toolRunner({
 		model: temImagem ? cfg.modeloVisao : cfg.modelo,
@@ -300,6 +481,7 @@ async function chamarModelo(
 		messages: [{ role: "user", content: conteudo as never }],
 		max_iterations: 12,
 	});
+	console.log(`tempos: turno=${Date.now() - t2}ms modelo=${temImagem ? cfg.modeloVisao : cfg.modelo}`);
 
 	const texto = resposta.content
 		.filter((b) => b.type === "text")
@@ -335,6 +517,7 @@ export async function processarMensagem(
 	mensagem: MensagemRecebida,
 	cfg: ConfigModelo,
 	limiteTurnosDia: number,
+	avisar: Avisar | null = null,
 ): Promise<string> {
 	if (mensagem.deGrupo) return TEXTO_GRUPO;
 
@@ -347,6 +530,19 @@ export async function processarMensagem(
 
 	const turnos = await registrarTurno(db, userId, new Date().toISOString().slice(0, 10));
 	if (turnos > limiteTurnosDia) return TEXTO_TETO;
+
+	// Sinal de vida ANTES do trabalho longo. Turno com nota fiscal passa minutos
+	// na fila, e silêncio total parece pane — foi assim que o produto pareceu
+	// morto no primeiro teste real. Vem depois dos portões de propósito:
+	// estranho não recebe aviso nenhum.
+	const jaDitas: string[] = [];
+	if (mensagem.imagemUrl && avisar) {
+		const frase =
+			(await narrar(cfg, "recebi a foto da nota e comecei a olhar.")) ??
+			"Recebi sua nota 📸 já tô olhando.";
+		jaDitas.push(frase);
+		await avisar(frase).catch(() => {});
+	}
 
 	// QR ANTES DO MODELO. Não custa token e decide o caminho do turno: com QR os
 	// valores virão da Receita; sem QR, o modelo olha a foto uma vez e o prompt
@@ -363,6 +559,8 @@ export async function processarMensagem(
 				chamar: ferramentas.chamar,
 				urlNfce: leitura?.urlNfce ?? null,
 				chave: leitura?.chave ?? null,
+				avisar,
+				jaDitas,
 			},
 			cfg,
 			db,
