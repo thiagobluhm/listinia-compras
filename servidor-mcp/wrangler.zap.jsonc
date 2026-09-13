@@ -25,7 +25,13 @@
 		"FOUNDRY_MODELO_VISAO": "claude-opus-5",
 		"FOUNDRY_WORKER_A": "claude-haiku-4-5",
 		"FOUNDRY_WORKER_B": "claude-sonnet-5",
-		"LIMITE_TURNOS_DIA": "30",
+		// Teto DESLIGADO na janela de teste do WhatsApp (13/09/2026), por ordem do
+		// dono: com 30 nao cabia uma rodada de teste inteira. A CONTAGEM continua —
+		// `uso_diario` soma sempre, e o teto so decide se responde — entao o turno
+		// medio por nota sai da medida e este numero volta calibrado depois.
+		// Cuidado: "0" NAO desliga. O codigo le `Number(...) || 30`, e zero e falsy,
+		// entao "0" REATIVA o teto de 30. Desligar e por um numero alto.
+		"LIMITE_TURNOS_DIA": "100000",
 		// Narração do andamento em turno com foto. "0" cala o narrador sem deploy.
 		"NARRADOR": "1"
 	},
