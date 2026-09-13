@@ -23,6 +23,7 @@ import { abrirFerramentas, type FerramentaLLM } from "./ferramentas";
 import { buscarUsuarioPorTelefone, criarUsuario, ehAceite } from "./identidade";
 import { lerQrDoCupom } from "./cupom";
 import { resolverLoja, type FonteImagem, type TipoImagem } from "./estabelecimento";
+import { carregarConversa, gravarTurno, type FalaGravada } from "./conversa";
 import { lerPaginaNfce } from "./nfce";
 import { registrarTurno } from "./uso";
 import type { MensagemRecebida } from "./zapi";
@@ -86,11 +87,28 @@ melhor que ter dado falso.
 No lugar disso:
 1. Campo não lido -> null, e diga à pessoa o que faltou, item a item.
 2. Não deu para ler nada -> diga o motivo real. Não improvise outro caminho.
-3. Dúvida entre duas leituras -> não escolha. Apresente as duas.
+3. Dúvida entre duas leituras -> não escolha por conta. Mas NÃO despeje as duas
+   grafias na pessoa: "li Comata e Cometa, qual é?" mostra a máquina confusa e
+   oferece duas opções que podem estar as duas erradas. Pergunte pelo que ela
+   sabe de cor — o bairro, a rua, a esquina. Quando o turno te entregar uma
+   pergunta pronta, faça EXATAMENTE aquela pergunta.
 4. Suposição útil -> rotule como suposição.
 
 Sempre diga o que ficou de fora antes de gravar qualquer coisa. Nada entra na
 despensa com um buraco silencioso.
+
+COMO VOCÊ FALA — é conversa de WhatsApp, não formulário.
+- O caminho que você PEDE por padrão é a foto da nota fiscal, ou o QR do
+  rodapé. É o que dá o dado bom e é o que menos dá trabalho para a pessoa.
+- Mas se ela preferir digitar item a item, ou mandar uma planilha, está ótimo:
+  aceite e se vire com o que vier. NUNCA devolva uma lista de campos para ela
+  preencher ("me manda NOME, CATEGORIA, QUANTIDADE e VALOR"). Isso é
+  formulário, e ninguém preenche formulário no zap.
+- Quando faltar algo, pergunte UMA coisa por vez, na língua dela.
+- NÃO explique como você funciona por dentro. A pessoa não precisa saber que
+  houve duas leituras, quantos modelos olharam a foto, o que é chave de acesso
+  nem por que a consulta falhou. Diga o que dá para fazer agora, não a mecânica
+  do que aconteceu aqui dentro.
 
 NOTA FISCAL — duas fontes, e a ordem entre elas não se negocia.
 1. Se veio QR, chame "cupom_ler" PRIMEIRO. O que ela devolver é a Receita
@@ -180,6 +198,8 @@ export interface EntradaModelo {
 	urlNfce: string | null;
 	/** Chave de acesso da nota. Vale mesmo se a página da Receita não abrir. */
 	chave: string | null;
+	/** O que já foi dito nesta conversa, da mais antiga para a mais nova. */
+	historico: FalaGravada[];
 	/** Manda recado no meio do turno. `null` quando ninguém quer ser avisado. */
 	avisar: Avisar | null;
 	/** Falas já ditas neste turno, para o narrador não se repetir. */
@@ -458,13 +478,14 @@ async function chamarModelo(
 			type: "text",
 			text:
 				loja.status === "acordo"
-					? `[Loja conferida por dupla leitura: CNPJ ${i?.cnpj ?? "não lido"}, ` +
-						`${i?.cidade ?? "?"}/${i?.uf ?? "?"}. ` +
+					? `[Loja: CNPJ ${i?.cnpj ?? "não lido"}, ${i?.cidade ?? "?"}/${i?.uf ?? "?"}. ` +
 						(i?.nome
 							? `Nome: ${i.nome}.`
-							: `As duas leituras DISCORDARAM do nome. ${loja.pergunta ?? ""} Não escolha um por conta.`) +
+							: `O NOME não está confirmado. Faça exatamente esta pergunta, sem explicar por quê: ` +
+								`"${loja.pergunta ?? ""}" Não escolha um nome por conta.`) +
 						(loja.estabelecimentoId ? " Já está cadastrado." : "")
-					: `[Não consegui confirmar a loja. ${loja.pergunta}]`,
+					: `[A loja não está confirmada. Faça exatamente esta pergunta, sem explicar por quê: ` +
+						`"${loja.pergunta}"]`,
 		});
 	}
 	conteudo.push({ type: "text", text: entrada.mensagem.texto || "(mensagem sem texto)" });
@@ -478,7 +499,13 @@ async function chamarModelo(
 		max_tokens: temImagem ? 16000 : 4096,
 		system: entrada.system,
 		tools: ferramentas,
-		messages: [{ role: "user", content: conteudo as never }],
+		// O HISTÓRICO VEM ANTES, e é o que faz a pergunta fechada da loja
+		// funcionar: sem ele, a pessoa responde "Supermercado Cometa" e o turno
+		// não sabe que alguém perguntou o nome de um mercado.
+		messages: [
+			...entrada.historico.map((f) => ({ role: f.papel, content: f.texto })),
+			{ role: "user", content: conteudo },
+		] as never,
 		max_iterations: 12,
 	});
 	console.log(`tempos: turno=${Date.now() - t2}ms modelo=${temImagem ? cfg.modeloVisao : cfg.modelo}`);
@@ -549,9 +576,11 @@ export async function processarMensagem(
 	// já diz o que ele pode e não pode concluir dela.
 	const leitura = mensagem.imagemUrl ? await lerQrDoCupom(mensagem.imagemUrl) : null;
 
+	const historico = await carregarConversa(db, userId);
+
 	const ferramentas = await abrirFerramentas(db, userId);
 	try {
-		return await chamarModelo(
+		const resposta = await chamarModelo(
 			{
 				system: SYSTEM_PROMPT,
 				ferramentas: ferramentas.defs,
@@ -559,12 +588,21 @@ export async function processarMensagem(
 				chamar: ferramentas.chamar,
 				urlNfce: leitura?.urlNfce ?? null,
 				chave: leitura?.chave ?? null,
+				historico,
 				avisar,
 				jaDitas,
 			},
 			cfg,
 			db,
 		);
+		// A foto vira MARCADOR no histórico, nunca base64. O modelo não precisa
+		// rever a imagem para lembrar do que leu — a leitura dele fica na
+		// resposta que estamos gravando aqui do lado.
+		const doUsuario = mensagem.imagemUrl
+			? `[foto de nota fiscal] ${mensagem.texto}`.trim()
+			: mensagem.texto;
+		await gravarTurno(db, userId, doUsuario || "(mensagem sem texto)", resposta);
+		return resposta;
 	} finally {
 		await ferramentas.fechar();
 	}
