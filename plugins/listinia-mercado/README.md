@@ -129,4 +129,4 @@ uma conta por loja.
 
 ## Autor
 
-Thiago Bluhm — AIstein LTDA.
+AIstein LTDA.

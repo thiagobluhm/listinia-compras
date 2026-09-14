@@ -36,9 +36,16 @@
 		"NARRADOR": "1"
 	},
 
-	// Sem custom_domain enquanto for MVP de um número só: a URL workers.dev
-	// serve para apontar o webhook da Z-API. O domínio entra quando o produto
-	// sair do teste com uma pessoa.
+	// A zona listinia.com.br ja esta na Cloudflare, e o custom_domain cria o
+	// registro DNS sozinho no primeiro deploy — mesmo padrao de compras e de
+	// mercado. O workers_dev fica FALSO de proposito: a URL *.workers.dev
+	// carrega o nome da CONTA, e nome de pessoa fisica nao entra em superficie
+	// publica (ver CLAUDE.md, regra 1). Consequencia operacional: trocar a URL
+	// EXIGE repontar o webhook da Z-API para o dominio novo.
+	"routes": [
+		{ "pattern": "zap.listinia.com.br", "custom_domain": true }
+	],
+	"workers_dev": false,
 
 	// Browser Run (ex-Browser Rendering): Chrome headless para abrir a pagina da
 	// NFC-e na Receita. As SEFAZ montam a tabela de itens por JavaScript, entao

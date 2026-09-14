@@ -124,7 +124,7 @@ mantém o plugin e o app dizendo a mesma coisa.
 
 ## Autor
 
-Thiago Bluhm — AIstein LTDA.
+AIstein LTDA.
 
 ## Roadmap
 
